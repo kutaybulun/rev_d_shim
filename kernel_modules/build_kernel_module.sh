@@ -16,8 +16,16 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-# Change directory to the first argument
+# By default, just run make with ARCH=arm and CROSS_COMPILE=arm-linux-gnueabihf-
+MAKE_CMD="make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$REV_D_SHIM_DIR/snickerdoodle_src/build/kernel"
+
+# Optionally append the second argument to the make command
+if [ $# -eq 2 ]; then
+    MAKE_CMD="$MAKE_CMD $2"
+fi
+
+# Change directory to the first argument, checking if the directory exists
 cd "$1" || exit 1
 
-# Run make with ARCH=arm
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KDIR=$REV_D_SHIM_DIR/snickerdoodle_src/build/kernel
+# Run the make command
+$MAKE_CMD
