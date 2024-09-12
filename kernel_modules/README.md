@@ -5,10 +5,10 @@ To build custom kernel modules, you first need to build the kernel itself. Pleas
 Once the kernel is built, you can build the kernel modules by running the following command:
 
 ```bash
-./build-kernel.sh <MODULE DIRECTORY> <MAKE TARGET>
+./build_kernel_modules.sh <MODULE DIRECTORY> <OPTIONAL MAKE TARGET>
 ```
 
-Where `<MODULE DIRECTORY>` is the directory containing the module you wish to build, and `<MAKE TARGET>` is the optional target like "clean" that will be passed to the makefile. The default (no target) will build the module to a `.ko` file in the module directory.
+Where `<MODULE DIRECTORY>` is the directory containing the module you wish to build, and `<OPTIONAL MAKE TARGET>` is the optional target like "clean" that will be passed to the makefile. The default (no target) will build the module to a `.ko` file in the module directory.
 
 To make a new module, create a new directory in the `kernel_modules` directory and add a `Makefile` to build the module. The `Makefile` for `my_module.c` should look something like this:
 
