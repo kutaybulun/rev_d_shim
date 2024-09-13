@@ -1,13 +1,15 @@
 
 package require fileutil
 
+# Arguments: project_name part_name core_vendor_list
 set project_name [lindex $argv 0]
 set part_name [lindex $argv 1]
 set core_vendor_list [lindex $argv 2]
 
-
+# Clear out old build files
 file delete -force tmp/$project_name.cache tmp/$project_name.gen tmp/$project_name.hw tmp/$project_name.ip_user_files tmp/$project_name.runs tmp/$project_name.sim tmp/$project_name.srcs tmp/$project_name.xpr
 
+# Create the project
 create_project -part $part_name $project_name tmp
 
 # Collect the paths to vendor cores directories
