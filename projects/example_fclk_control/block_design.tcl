@@ -2,9 +2,7 @@
 
 # Create the PS (processing_system7)
 # - GP AXI 0 (Master) clock is connected to the processing system's first clock, FCLK_CLK0
-cell xilinx.com:ip:processing_system7:5.5 ps_0 {
-  PCW_FPGA0_PERIPHERAL_FREQMHZ 5.0
-} {
+cell xilinx.com:ip:processing_system7:5.5 ps_0 {} {
   M_AXI_GP0_ACLK ps_0/FCLK_CLK0
 }
 
