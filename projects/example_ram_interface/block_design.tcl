@@ -9,11 +9,12 @@ cell xilinx.com:ip:processing_system7:5.5 ps_0 {
 } {
   M_AXI_GP0_ACLK ps_0/FCLK_CLK0
 }
-
 # Create all required interconnections
 # - Make the processing system's FIXED_IO and DDR interfaces external
+# - Apply the board preset
 apply_bd_automation -rule xilinx.com:bd_rule:processing_system7 -config {
   make_external {FIXED_IO, DDR}
+  apply_board_preset "1"
   Master Disable
   Slave Disable
 } [get_bd_cells ps_0]

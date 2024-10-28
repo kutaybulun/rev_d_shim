@@ -39,6 +39,11 @@ update_ip_catalog
 ### Define a set of Tcl procedures to simplify the creation of block designs
 ################################################################################
 
+# Procedure for returning the directory of the current project
+proc project_dir {} {
+  return "projects/$project_name"
+}
+
 # Procedure for connecting (wiring) two ports together
 proc wire {name1 name2} {
   set port1 [get_bd_pins $name1]
