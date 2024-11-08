@@ -15,7 +15,7 @@ fi
 
 # Check if the board exists in "boards"
 if [ ! -d "boards/$2" ]; then
-    echo "Board directory not found: bards/$2"
+    echo "Board directory not found: boards/$2"
     exit 1
 fi
 

@@ -3,7 +3,7 @@
 # The script can recurse into tcl files sourced by the "module" procedure.
 
 # Check if a file is provided as an argument
-if [ $# -eq 0 ]; then
+if [ $# -ne 1 ]; then
     echo "Usage: $0 <file>"
     exit 1
 fi

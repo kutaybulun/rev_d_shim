@@ -1,16 +1,5 @@
 # Ignore Vivado generated files
-*.apk
-*.bin
-*.dtb
-*.img
-*.tar.gz
-*.zip
-vivado*
-webtalk*
 tmp
-uImage
+out
 .vscode
 .Xil
-
-# Not to be ignored
-!scripts/vivado_repo_init.tcl
