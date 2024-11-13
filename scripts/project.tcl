@@ -26,10 +26,10 @@ set board_part [dict get $board_config_dict board_part]
 
 ## Initialize the project and dependencies
 # Clear out old build files
-file delete -force tmp/${board_name}_${project_name}.cache tmp/${board_name}_${project_name}.gen tmp/${board_name}_${project_name}.hw tmp/${board_name}_${project_name}.ip_user_files tmp/${board_name}_${project_name}.runs tmp/${board_name}_${project_name}.sim tmp/${board_name}_${project_name}.srcs tmp/${board_name}_${project_name}.xpr
+file delete -force tmp/${board_name}/${project_name}.cache tmp/${board_name}/${project_name}.gen tmp/${board_name}/${project_name}.hw tmp/${board_name}/${project_name}.ip_user_files tmp/${board_name}/${project_name}.runs tmp/${board_name}/${project_name}.sim tmp/${board_name}/${project_name}.srcs tmp/${board_name}/${project_name}.xpr
 
 # Create the project
-create_project -part $part_name ${board_name}_${project_name} tmp
+create_project -part $part_name ${board_name}/${project_name} tmp
 
 # Set the board part
 set_property BOARD_PART $board_part [current_project]
@@ -164,7 +164,7 @@ generate_target all $system
 make_wrapper -files $system -top
 
 # Store the wrapper file name
-set wrapper [fileutil::findByPattern tmp/${board_name}_${project_name}.gen system_wrapper.v]
+set wrapper [fileutil::findByPattern tmp/${board_name}/${project_name}.gen system_wrapper.v]
 
 # Add the wrapper to the project and make it the top module
 add_files -norecurse $wrapper

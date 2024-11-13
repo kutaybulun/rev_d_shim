@@ -7,8 +7,8 @@ if [ $# -ne 2 ]; then
 fi
 
 # Check that the necessary XSA exists
-if [ ! -f "tmp/${1}_${2}.xsa" ]; then
-    echo "Missing generated XSA hardware definition file: tmp/${1}_${2}.xsa."
+if [ ! -f "tmp/${1}/${2}.xsa" ]; then
+    echo "Missing generated XSA hardware definition file: tmp/${1}/${2}.xsa."
     exit 1
 fi
 
@@ -25,25 +25,24 @@ fi
 # Make the project
 cd tmp
 echo "[MAKE SCRIPT] Creating project"
-petalinux-create project --template zynq --name ${1}_${2}_petalinux
+petalinux-create project --template zynq --name ${1}/${2}_petalinux
 
-# Copy the configuration files into the project
-echo "[MAKE SCRIPT] Copying configuration files"
-cp ../projects/${2}/petalinux_cfg/config ${1}_${2}_petalinux/project-spec/configs
-cp ../projects/${2}/petalinux_cfg/rootfs_config ${1}_${2}_petalinux/project-spec/configs
+# # Copy the configuration files into the project
+# echo "[MAKE SCRIPT] Copying configuration files"
+# cp ../projects/${2}/petalinux_cfg/config ${1}/${2}_petalinux/project-spec/configs
+# cp ../projects/${2}/petalinux_cfg/rootfs_config ${1}/${2}_petalinux/project-spec/configs
 
 # Enter the project
-cd ${1}_${2}_petalinux
+cd ${1}/${2}_petalinux
 
 # Configure the project and add the XSA file
 echo "[MAKE SCRIPT] Configuring project"
-petalinux-config --get-hw-description ../${1}_${2}.xsa --silentconfig
+petalinux-config --get-hw-description ../${2}.xsa --silentconfig
 
 # Configure the root filesystem
 echo "[MAKE SCRIPT] Configuring root filesystem"
 petalinux-config -c rootfs --silentconfig
 
-
-# Build the project
-echo "[MAKE SCRIPT] Building the project"
-petalinux-build
+# # Build the project
+# echo "[MAKE SCRIPT] Building the project"
+# petalinux-build
