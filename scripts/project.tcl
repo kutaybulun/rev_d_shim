@@ -7,6 +7,8 @@ package require json
 set board_name [lindex $argv 0]
 set project_name [lindex $argv 1]
 
+# Set the temporary directory for the project
+set tmp_dir tmp/${board_name}/${project_name}
 
 ## Extract the part information from the board name
 # Read the script config for the board into a dict
@@ -26,10 +28,10 @@ set board_part [dict get $board_config_dict board_part]
 
 ## Initialize the project and dependencies
 # Clear out old build files
-file delete -force tmp/${board_name}/${project_name}.cache tmp/${board_name}/${project_name}.gen tmp/${board_name}/${project_name}.hw tmp/${board_name}/${project_name}.ip_user_files tmp/${board_name}/${project_name}.runs tmp/${board_name}/${project_name}.sim tmp/${board_name}/${project_name}.srcs tmp/${board_name}/${project_name}.xpr
+file delete -force ${tmp_dir}/project.cache ${tmp_dir}/project.gen ${tmp_dir}/project.hw ${tmp_dir}/project.ip_user_files ${tmp_dir}/project.runs ${tmp_dir}/project.sim ${tmp_dir}/project.srcs ${tmp_dir}/project.xpr
 
 # Create the project
-create_project -part $part_name ${board_name}/${project_name} tmp
+create_project -part $part_name project ${tmp_dir}
 
 # Set the board part
 set_property BOARD_PART $board_part [current_project]
@@ -164,7 +166,7 @@ generate_target all $system
 make_wrapper -files $system -top
 
 # Store the wrapper file name
-set wrapper [fileutil::findByPattern tmp/${board_name}/${project_name}.gen system_wrapper.v]
+set wrapper [fileutil::findByPattern ${tmp_dir}/project.gen system_wrapper.v]
 
 # Add the wrapper to the project and make it the top module
 add_files -norecurse $wrapper

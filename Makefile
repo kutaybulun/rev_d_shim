@@ -85,22 +85,22 @@ cleanall: clean
 
 # The bitstream file
 # Built from the Vivado project
-bit: tmp/$(BOARD)/$(PROJECT).bit
+bit: tmp/$(BOARD)/$(PROJECT)/bitstream.bit
 	mkdir -p out/$(BOARD)/$(PROJECT)
-	cp tmp/$(BOARD)/$(PROJECT).bit out/$(BOARD)/$(PROJECT)/system.bit
+	cp tmp/$(BOARD)/$(PROJECT)/bitstream.bit out/$(BOARD)/$(PROJECT)/system.bit
 
 # The compressed root filesystem
 # Made in the petalinux build
-rootfs: tmp/$(BOARD)/$(PROJECT)_petalinux/images/linux/rootfs.tar.gz
+rootfs: tmp/$(BOARD)/$(PROJECT)/petalinux/images/linux/rootfs.tar.gz
 	mkdir -p out/$(BOARD)/$(PROJECT)
-	cp tmp/$(BOARD)/$(PROJECT)_petalinux/images/linux/rootfs.tar.gz out/$(BOARD)/$(PROJECT)/rootfs.tar.gz
+	cp tmp/$(BOARD)/$(PROJECT)/petalinux/images/linux/rootfs.tar.gz out/$(BOARD)/$(PROJECT)/rootfs.tar.gz
 
 # The compressed boot files
 # Requires the petalinux build (which will make the rootfs)
-boot: tmp/$(BOARD)/$(PROJECT)_petalinux/images/linux/rootfs.tar.gz
+boot: tmp/$(BOARD)/$(PROJECT)/petalinux/images/linux/rootfs.tar.gz
 	mkdir -p out/$(BOARD)/$(PROJECT)
 	@./scripts/makefile_status.sh "PACKAGING BOOT.BIN"
-	cd tmp/$(BOARD)/$(PROJECT)_petalinux && \
+	cd tmp/$(BOARD)/$(PROJECT)/petalinux && \
 		source $(PETALINUX_PATH)/settings.sh && \
 		petalinux-package boot \
 		--format BIN \
@@ -110,17 +110,11 @@ boot: tmp/$(BOARD)/$(PROJECT)_petalinux/images/linux/rootfs.tar.gz
 		--boot-device sd \
 		--force
 	tar -czf out/$(BOARD)/$(PROJECT)/BOOT.tar.gz \
-		-C tmp/$(BOARD)/$(PROJECT)_petalinux/images/linux \
+		-C tmp/$(BOARD)/$(PROJECT)/petalinux/images/linux \
 		BOOT.BIN \
 		image.ub \
 		boot.scr \
 		system.dtb
-
-# system.bit \
-
-#	--boot-script \
-# --dtb \
-#	--u-boot \
 
 
 #############################################
@@ -139,11 +133,11 @@ cores: $(addprefix tmp/cores/, $(PROJECT_CORES))
 
 # The Xilinx project file
 # This file can be edited in Vivado to test TCL commands and changes
-xpr: tmp/$(BOARD)/$(PROJECT).xpr
+xpr: tmp/$(BOARD)/$(PROJECT)/project.xpr
 
 # The hardware definition file
 # This file is used by petalinux to build the linux system
-xsa: tmp/$(BOARD)/$(PROJECT).xsa
+xsa: tmp/$(BOARD)/$(PROJECT)/hw_def.xsa
 
 #############################################
 
@@ -164,30 +158,30 @@ tmp/cores/%: cores/%.v
 # Requires all the cores
 # Built using the `scripts/project.tcl` script, which uses
 # 	the block design and ports files from the project
-tmp/$(BOARD)/$(PROJECT).xpr: projects/$(PROJECT) $(addprefix tmp/cores/, $(PROJECT_CORES))
-	@./scripts/makefile_status.sh "MAKING PROJECT: $(BOARD)/$(PROJECT).xpr"
+tmp/$(BOARD)/$(PROJECT)/project.xpr: projects/$(PROJECT) $(addprefix tmp/cores/, $(PROJECT_CORES))
+	@./scripts/makefile_status.sh "MAKING PROJECT: $(BOARD)/$(PROJECT)/project.xpr"
 	mkdir -p $(@D)
 	$(VIVADO) -source scripts/project.tcl -tclargs $(BOARD) $(PROJECT)
 
 # The bitstream file (.bit)
 # Requires the project file
 # Built using the `scripts/bitstream.tcl` script, with bitstream compression set to false
-tmp/$(BOARD)/$(PROJECT).bit: tmp/$(BOARD)/$(PROJECT).xpr
-	@./scripts/makefile_status.sh "MAKING BITSTREAM: $(BOARD)/$(PROJECT).bit"
+tmp/$(BOARD)/$(PROJECT)/bitstream.bit: tmp/$(BOARD)/$(PROJECT)/project.xpr
+	@./scripts/makefile_status.sh "MAKING BITSTREAM: $(BOARD)/$(PROJECT)/bitstream.bit"
 	$(VIVADO) -source scripts/bitstream.tcl -tclargs $(BOARD)/$(PROJECT) false
 
 # The hardware definition file
 # Requires the project file
 # Built using the scripts/hw_def.tcl script
-tmp/$(BOARD)/$(PROJECT).xsa: tmp/$(BOARD)/$(PROJECT).xpr
-	@./scripts/makefile_status.sh "MAKING HW DEF: $(BOARD)/$(PROJECT).xsa"
+tmp/$(BOARD)/$(PROJECT)/hw_def.xsa: tmp/$(BOARD)/$(PROJECT)/project.xpr
+	@./scripts/makefile_status.sh "MAKING HW DEF: $(BOARD)/$(PROJECT)/hw_def.xsa"
 	$(VIVADO) -source scripts/hw_def.tcl -tclargs $(BOARD)/$(PROJECT)
 
 # The compressed root filesystem
 # Requires the hardware definition file
 # Build using the scripts/petalinux.sh file
-tmp/$(BOARD)/$(PROJECT)_petalinux/images/linux/rootfs.tar.gz: tmp/$(BOARD)/$(PROJECT).xsa
-	@./scripts/makefile_status.sh "MAKING LINUX SYSTEM: $(BOARD)/$(PROJECT)_petalinux"
+tmp/$(BOARD)/$(PROJECT)/petalinux/images/linux/rootfs.tar.gz: tmp/$(BOARD)/$(PROJECT)/hw_def.xsa
+	@./scripts/makefile_status.sh "MAKING LINUX SYSTEM: $(BOARD)/$(PROJECT)/petalinux"
 	source $(PETALINUX_PATH)/settings.sh && \
 	scripts/petalinux.sh $(BOARD) $(PROJECT)
 

@@ -7,8 +7,8 @@ if [ $# -ne 2 ]; then
 fi
 
 # Check that the necessary XSA exists
-if [ ! -f "tmp/${1}/${2}.xsa" ]; then
-    echo "Missing generated XSA hardware definition file: tmp/${1}/${2}.xsa."
+if [ ! -f "tmp/${1}/${2}/hw_def.xsa" ]; then
+    echo "Missing generated XSA hardware definition file: tmp/${1}/${2}/hw_def.xsa."
     exit 1
 fi
 
@@ -25,24 +25,25 @@ fi
 # Make the project
 cd tmp
 echo "[MAKE SCRIPT] Creating project"
-petalinux-create project --template zynq --name ${1}/${2}_petalinux
-
-# # Copy the configuration files into the project
-# echo "[MAKE SCRIPT] Copying configuration files"
-# cp ../projects/${2}/petalinux_cfg/config ${1}/${2}_petalinux/project-spec/configs
-# cp ../projects/${2}/petalinux_cfg/rootfs_config ${1}/${2}_petalinux/project-spec/configs
+petalinux-create project --template zynq --name ${1}/${2}/petalinux
 
 # Enter the project
-cd ${1}/${2}_petalinux
+cd ${1}/${2}/petalinux
 
-# Configure the project and add the XSA file
-echo "[MAKE SCRIPT] Configuring project"
-petalinux-config --get-hw-description ../${2}.xsa --silentconfig
+# Patch the project configuration
+echo "[MAKE SCRIPT] Initializing default project configuration"
+petalinux-config --get-hw-description ../hw_def.xsa --silentconfig
+echo "[MAKE SCRIPT] Patching and configuring project"
+patch project-spec/configs/config ../../../../projects/${2}/petalinux_cfg/config.patch
+petalinux-config --silentconfig
 
-# Configure the root filesystem
-echo "[MAKE SCRIPT] Configuring root filesystem"
+# Patch the root filesystem configuration
+echo "[MAKE SCRIPT] Initializing default root filesystem configuration"
+petalinux-config -c rootfs --silentconfig
+echo "[MAKE SCRIPT] Patching and configuring root filesystem"
+patch project-spec/configs/rootfs_config ../../../../projects/${2}/petalinux_cfg/rootfs_config.patch
 petalinux-config -c rootfs --silentconfig
 
-# # Build the project
-# echo "[MAKE SCRIPT] Building the project"
-# petalinux-build
+# Build the project
+echo "[MAKE SCRIPT] Building the project"
+petalinux-build
