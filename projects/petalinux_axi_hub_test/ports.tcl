@@ -1,1 +1,1 @@
-../../boards/snickerdoodle_black/default_ports.tcl
+../../boards/zynq_7010/default_ports.tcl

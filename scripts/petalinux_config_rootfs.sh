@@ -54,7 +54,7 @@ if [ -d "petalinux_template" ]; then
 fi
 mkdir petalinux_template
 cd petalinux_template
-petalinux-create project --template zynq --name petalinux
+petalinux-create -t project --template zynq --name petalinux
 cd petalinux
 
 # Patch the project configuration

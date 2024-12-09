@@ -102,7 +102,7 @@ boot: tmp/$(BOARD)/$(PROJECT)/petalinux/images/linux/rootfs.tar.gz
 	@./scripts/makefile_status.sh "PACKAGING BOOT.BIN"
 	cd tmp/$(BOARD)/$(PROJECT)/petalinux && \
 		source $(PETALINUX_PATH)/settings.sh && \
-		petalinux-package boot \
+		petalinux-package --boot \
 		--format BIN \
 		--fsbl \
 		--fpga \
