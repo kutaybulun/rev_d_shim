@@ -1,5 +1,3 @@
---- project-spec/configs/config.default	2024-11-14 16:38:45.006186378 -0500
-+++ project-spec/configs/config	2024-11-14 16:39:31.848479459 -0500
 @@ -211,24 +211,22 @@
  # Image Packaging Configuration
  #

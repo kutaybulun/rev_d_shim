@@ -58,8 +58,8 @@ int main(int argc, char *argv[])
     *shim_memory, \
     *trigger_ctrl, *tc_trigger_count, *trigger_lockout_ptr, *trigger_polarity, *trigger_enable;
   
-  if (argc != 5) {
-    fprintf(stderr, "Usage: %s <trigger lockout (ms)> <fclk_divider_0> <fclk_divider_1> <inputfile>\n", argv[0]);
+  if (!(argc == 5) && !(argc == 6)) {
+    fprintf(stderr, "Usage: %s <trigger lockout (ms)> <fclk_divider_0> <fclk_divider_1> <inputfile> [board_to_log]\n", argv[0]);
     exit(-1);
   }
 
@@ -68,11 +68,19 @@ int main(int argc, char *argv[])
 
   if (fclk0_div0 > 63 || fclk0_div1 > 63) {
     fprintf(stderr, "FCLK dividers must be less than 64\n");
-    fprintf(stderr, "Usage: %s <trigger lockout (ms)> <fclk_divider_0> <fclk_divider_1> <inputfile>\n", argv[0]);
+    fprintf(stderr, "Usage: %s <trigger lockout (ms)> <fclk_divider_0> <fclk_divider_1> <inputfile> [board_to_log]\n", argv[0]);
     exit(-1);
   }
 
-
+  int board_to_log = 0;
+  if (argc == 6) {
+    board_to_log = atoi(argv[5]);
+    if (board_to_log < 0 || board_to_log > 3) {
+      fprintf(stderr, "Board to log must be 0, 1, 2, or 3\n");
+      fprintf(stderr, "Usage: %s <trigger lockout (ms)> <fclk_divider_0> <fclk_divider_1> <inputfile> [board_to_log]\n", argv[0]);
+      exit(-1);
+    }
+  }
 
   //// Read the input file
 
@@ -96,13 +104,13 @@ int main(int argc, char *argv[])
     } while(1);
     
     fprintf(stdout, "%d waveform samples found !\n", line_counter);
-    // check if we have enough memory
+    // Check if we have enough memory
     if(line_counter * 32 > 65536) {
       fprintf(stderr, "Not enough block RAM in this FPGA for your file with this software ! Try staying below %d samples.\n", 65536/32);
       exit(-1);
     }
     
-    // allocate memory
+    // Allocate memory -- 32 channels
     waveform_buffer = (int **) malloc(32*sizeof(int *));
     if(waveform_buffer == NULL) {
       fprintf(stderr, "Error allocating waveform memory !\n");
@@ -117,9 +125,9 @@ int main(int argc, char *argv[])
       }
     }
     
-    fprintf(stdout, "|"); fflush(stdout);
+    fprintf(stdout, ":"); fflush(stdout);
     rewind(input_file);
-    unsigned int lrcounter = 0;
+    unsigned int line_read_counter = 0;
     do {
       line_length = 2048;
       ssize_t nchars = getline((char **) &linebuffer, &line_length, input_file);
@@ -130,7 +138,8 @@ int main(int argc, char *argv[])
 
       int val, offset;
       char *linebuffer_p = linebuffer;
-      // found a valid line
+
+      // Read valid lines
       for(int k=0; k<32; k++) {
         if(sscanf(linebuffer_p, " %d%n", &val, &offset) == 0) {
           fprintf(stderr, "some sort of parsing error !\n");
@@ -139,12 +148,12 @@ int main(int argc, char *argv[])
           exit(-1);
         }
         linebuffer_p = linebuffer_p + offset;
-        waveform_buffer[k][lrcounter] = val;
+        waveform_buffer[k][line_read_counter] = val;
       }
       fprintf(stdout, "."); fflush(stdout);
-      lrcounter++;
+      line_read_counter++;
     } while(1);
-    fprintf(stdout, "|"); fflush(stdout);
+    fprintf(stdout, ":"); fflush(stdout);
     
     fprintf(stdout, "\n");
     
@@ -154,7 +163,7 @@ int main(int argc, char *argv[])
     exit(-1);
   }
 
-  sleep(1);
+  usleep(50000);
 
 
 
@@ -168,7 +177,7 @@ int main(int argc, char *argv[])
   
   sigaction(SIGINT, &sigIntHandler, NULL);
 
-  sleep(1);
+  usleep(50000);
 
 
   //// Map the memory
@@ -212,7 +221,7 @@ int main(int argc, char *argv[])
   slcr[2] = SLCR_LOCK_CODE;
   printf(".... Done !\n"); fflush(stdout);
 
-  sleep(1);
+  usleep(50000);
 
   // Check version etc
   dac_nsamples = ((uint32_t *)(dac_ctrl+0));
@@ -230,7 +239,7 @@ int main(int argc, char *argv[])
 
   *trigger_lockout_ptr = (uint32_t)(floor(atof(argv[1]) * 1e-3 * FCLK0_BASELINE_FREQ / (fclk0_div0 * fclk0_div1)));
 
-  sleep(1);
+  usleep(50000);
   
   printf("Trigger lockout = %d FPGA clockcycles\n", *trigger_lockout_ptr);
   *trigger_polarity = 1;
@@ -248,13 +257,26 @@ int main(int argc, char *argv[])
   int dbo = *dac_board_offset;
 
   fprintf(stdout, "board offset %d words\n", dbo);
-  
 
 
   //// Load the sequence into the shim memory
 
-  for (int sample=0; sample<line_counter; sample++)  {
-    for (int channel=0; channel<8; channel++) {
+  if (argc == 6) {
+    printf("Logging board %d\n", board_to_log);
+    fd = open("shim.log", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) {
+      perror("open");
+      exit(1);
+    }
+    for (int sample = 0; sample < line_counter; sample++) {
+      for (int channel = 0; channel < 8; channel++) {
+        dprintf(fd, "%d\n", waveform_buffer[board_to_log*8+channel][sample]);
+      }
+    }
+  }
+
+  for (int sample = 0; sample < line_counter; sample++)  {
+    for (int channel = 0; channel < 8; channel++) {
       // board zero
       shim_memory[sample*8+channel      ] = ((channel | DAC_CMD) << 16) + (waveform_buffer[channel][sample] & 0xffff);
       // board one
@@ -269,10 +291,10 @@ int main(int argc, char *argv[])
   // set the DAC to external SPI clock, not fully working, so set it to 0x0 (enable is 0x1)
   *dac_control_register = 0x0;
 
-  // set to 50 KHz
-  // LCB -- set to 1000 to match Don's divider
+  // set to 50 KHz (50 MHz / 1000)
   *dac_refresh_divider = 1000;
   
+  // enable the DAC
   *dac_enable = 0x1;
 
 
@@ -280,10 +302,10 @@ int main(int argc, char *argv[])
 
   while(1) {
     printf(".... trigger count = %d (tc = %d)!\n", *dac_trigger_count, *tc_trigger_count); fflush(stdout);
-    sleep(2);
+    sleep(5);
   }
   
-  sleep(5);
+  sleep(1);
   *dac_enable = 0x0;
   return EXIT_SUCCESS;
 } // End main

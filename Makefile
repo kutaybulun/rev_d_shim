@@ -31,7 +31,7 @@ endif
 endif
 
 # Run some checks and setup, but only if there are targets other than clean or cleanall
-ifneq (true, CLEAN_ONLY) # Clean check
+ifneq (true, $(CLEAN_ONLY)) # Clean check
 
 # Check that the project and board exist, and that the necessary files are present
 ifeq ($(),$(wildcard boards/$(BOARD)/board_config.json))

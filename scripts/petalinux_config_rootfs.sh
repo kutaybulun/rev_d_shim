@@ -49,7 +49,7 @@ if [ ! -f "projects/${PRJ}/petalinux_cfg/config.patch" ]; then
 fi
 
 # Check that the PetaLinux root filesystem configuration patch does not already exist if not updating
-if [ -f "projects/${PRJ}/petalinux_cfg/rootfs_config.patch" ] && [ $UPDATE -ne 1]; then
+if [ -f "projects/${PRJ}/petalinux_cfg/rootfs_config.patch" ] && [ $UPDATE -ne 1 ]; then
     echo "PetaLinux root filesystem configuration patch already exists for project ${PRJ}: projects/${PRJ}/petalinux_cfg/rootfs_config.patch"
     echo "If you want to use that patch as the start point, use the following command:"
     echo
@@ -116,4 +116,6 @@ petalinux-config -c rootfs
 
 # Create a patch for the root filesystem configuration
 echo "[MAKE SCRIPT] Creating root filesystem configuration patch"
-diff -u project-spec/configs/rootfs_config.default project-spec/configs/rootfs_config > ../../../projects/${PRJ}/petalinux_cfg/rootfs_config.patch
+diff -u project-spec/configs/rootfs_config.default project-spec/configs/rootfs_config | \
+    tail -n +3 > \
+    ../../../projects/${PRJ}/petalinux_cfg/rootfs_config.patch

@@ -1,5 +1,3 @@
---- project-spec/configs/rootfs_config.default	2024-11-14 17:25:53.543860125 -0500
-+++ project-spec/configs/rootfs_config	2024-11-14 17:27:28.649223904 -0500
 @@ -15,7 +15,7 @@
  #
  # sudo 

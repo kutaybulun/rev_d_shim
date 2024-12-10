@@ -1,5 +1,3 @@
---- tmp/snickerdoodle_black/petalinux_axi_hub_test/petalinux/project-spec/configs/rootfs_config	2024-11-13 17:17:17.826000821 -0500
-+++ projects/petalinux_axi_hub_test/petalinux_cfg/rootfs_config	2024-11-13 17:21:59.548796979 -0500
 @@ -15,7 +15,7 @@
  #
  # sudo 

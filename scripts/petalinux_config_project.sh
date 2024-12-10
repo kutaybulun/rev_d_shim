@@ -39,7 +39,7 @@ if [ ! -d "projects/${PRJ}" ]; then
 fi
 
 # Check that the project configuration patch does not already exist if not updating
-if [ -f "projects/${PRJ}/petalinux_cfg/config.patch" ] && [ $UPDATE -ne 1]; then
+if [ -f "projects/${PRJ}/petalinux_cfg/config.patch" ] && [ $UPDATE -ne 1 ]; then
     echo "PetaLinux project configuration patch already exists for project ${PRJ}: projects/${PRJ}/petalinux_cfg/config.patch"
     echo "If you want to use that patch as the start point, use the following command:"
     echo
@@ -100,4 +100,6 @@ petalinux-config
 
 # Create a patch for the project configuration
 echo "[CONFIG SCRIPT] Creating project configuration patch"
-diff -u project-spec/configs/config.default project-spec/configs/config > ../../../projects/${PRJ}/petalinux_cfg/config.patch
+diff -u project-spec/configs/config.default project-spec/configs/config | \
+    tail -n +3 > \
+    ../../../projects/${PRJ}/petalinux_cfg/config.patch
