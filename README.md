@@ -71,6 +71,10 @@ The Makefile will (with the help of the scripts, and marked by which build targe
 - `make sd`: Run the scripts `petalinux_build.sh` to build the PetaLinux-loaded SD card files for the project. This will output the final files to `out/[board]/[project]/`. It will create a compressed file for each of the two partitions listed in the [PetaLinux SD card partitioning documentation](https://docs.amd.com/r/2024.1-English/ug1144-petalinux-tools-reference-guide/Preparing-the-SD-Card). This requires the `PETALINUX_PATH` environment variable to be set, and PetaLinux project and rootfs config files (stored as differences from the default configurations) in the `projects/[project]/petalinux_cfg/` directory.
   - To create new PetaLinux configuration files in the correct format for this script, you can use the scripts `petalinux_config_project.sh` and `petalinux_config_rootfs.sh` in the `scripts/` directory. These scripts will create the necessary files in the `projects/[project]/petalinux_cfg/` directory.
 
+## Common build failures
+
+- Running out of disk space: Run `make clean` to remove the `tmp/` directory. This directory is used to store the Vivado project files, and can get quite large.
+- Network issues with PetaLinux: If your network connection is messy, PetaLinux can grind to a hald in the bitbake process. I'm not sure the best way to avoid this, aside from improving your connection.
 
 ## Directory Structure
 
