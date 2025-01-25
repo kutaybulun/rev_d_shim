@@ -1,14 +1,8 @@
 # Initialize the Vivado environment for the Snickerdoodle Rev D, declaring directories
 
-# First, set the REV_D_DIR environment variable to the repo root directory (in .bash_profile or similar)
-# Example:
-# ------------------------------------------------------------
-#     # Add Rev D directory
-#     export REV_D_DIR=/home/[YOUR_USERNAME]/Documents/rev_d_shim
-# ------------------------------------------------------------
-
-# Second, source this from your Vivado_init.tcl
-# Example:
+# Source this from your Vivado_init.tcl. 
+# Make sure to set the REV_D_DIR environment variable to the root of the this repository.
+# Example (to paste into Vivado_init.tcl):
 # ------------------------------------------------------------
 #     # Set up Rev D configuration
 #     set rev_d_dir $::env(REV_D_DIR)

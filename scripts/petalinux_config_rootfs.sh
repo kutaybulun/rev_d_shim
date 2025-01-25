@@ -1,6 +1,6 @@
 #!/bin/bash
 # Create a patch file for the PetaLinux filesystem configuration
-# Usage: petalinux.sh <board_name> <project_name> ['update' (optional)]
+# Usage: petalinux_config_rootfs.sh <board_name> <project_name> ['update' (optional)]
 if [ $# -ne 2 ] && [ $# -ne 3 ]; then
     echo "Usage: $0 <board_name> <project_name> ['update' (optional)]"
     exit 1
