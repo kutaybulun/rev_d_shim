@@ -46,8 +46,11 @@ endif
 ifeq ($(),$(wildcard projects/$(PROJECT)/ports.tcl))
 $(error Project "$(PROJECT)" does not have a ports file "projects/$(PROJECT)/ports.tcl")
 endif
-ifeq ($(),$(wildcard projects/$(PROJECT)/$(BOARD)_xdc/))
-$(error No support for board "$(BOARD)" in project "$(PROJECT)" -- design constraints folder "projects/$(PROJECT)/$(BOARD)_xdc/" does not exist or is empty)
+ifeq ($(),$(wildcard projects/$(PROJECT)/cfg/$(BOARD)/))
+$(error No support for board "$(BOARD)" in project "$(PROJECT)" -- configuration folder "projects/$(PROJECT)/cfg/$(BOARD)/" does not exist or is empty)
+endif
+ifeq ($(),$(wildcard projects/$(PROJECT)/cfg/$(BOARD)/xdc/))
+$(error No support for board "$(BOARD)" in project "$(PROJECT)" -- design constraints folder "projects/$(PROJECT)/cfg/$(BOARD)/xdc/" does not exist or is empty)
 endif
 
 # Extract the part and processor from the board configuration file

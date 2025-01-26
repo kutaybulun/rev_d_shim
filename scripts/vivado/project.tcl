@@ -189,7 +189,7 @@ if {[llength $files] > 0} {
 }
 
 # Load all XDC constraint files specific to the board from the project folder
-set files [glob -nocomplain projects/$project_name/{$board_name}_xdc/*.xdc]
+set files [glob -nocomplain projects/$project_name/cfg/{$board_name}/xdc/*.xdc]
 if {[llength $files] > 0} {
   add_files -norecurse -fileset constrs_1 $files
 }
