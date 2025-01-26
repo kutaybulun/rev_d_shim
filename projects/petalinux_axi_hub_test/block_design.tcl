@@ -66,7 +66,7 @@ cell pavel-demin:user:port_slicer fifo_0_cfg {
 }
 # Create a FIFO block connected to the AXI hub (see source file)
 module fifo_0 {
-  source projects/example_axi_hub_ports/fifo.tcl
+  source projects/example_axi_hub_ports/modules/fifo.tcl
 } {
   aclk ps_0/FCLK_CLK0
   s_axis hub_0/M00_AXIS
@@ -106,7 +106,7 @@ cell pavel-demin:user:port_slicer nand_0_cfg {
 }
 # Add a vector nand gate (see source file)
 module nand_0 {
-  source projects/example_axi_hub_regs/nand.tcl
+  source projects/example_axi_hub_regs/modules/nand.tcl
 } {
   nand_din_concat nand_0_cfg/dout
 }

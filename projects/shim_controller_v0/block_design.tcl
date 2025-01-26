@@ -62,7 +62,7 @@ auto_connect_axi 0x40000000 256K gradient_writer_0/S_AXI /ps_0/M_AXI_GP0
 
 # Create the shim_dac controller (spi sequencer)
 module shim_dac_0 {
-    source projects/shim_controller_v0/shim_dacs.tcl
+    source projects/shim_controller_v0/modules/shim_dacs.tcl
 } {
     spi_sequencer_0/BRAM_PORT0 gradient_memory_0/BRAM_PORTB
 }

@@ -44,7 +44,7 @@ addr 0x40000000 128M hub_0/S_AXI
 
 ## Add a vector nand gate (see source file)
 module fifo_0 {
-  source projects/example_axi_hub_regs/nand.tcl
+  source projects/example_axi_hub_regs/modules/nand.tcl
 } {
   nand_din_concat hub_0/cfg_data
   nand_res hub_0/sts_data
