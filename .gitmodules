@@ -1,9 +1,0 @@
-[submodule "snickerdoodle_src/rev-d-shim-snickerdoodle-dts"]
-	path = boards/snickerdoodle_black/linux_src/rev-d-shim-snickerdoodle-dts
-	url = https://github.com/LincolnCB/rev-d-shim-snickerdoodle-dts.git
-[submodule "snickerdoodle_src/rev-d-shim-snickerdoodle-u-boot"]
-	path = boards/snickerdoodle_black/linux_src/rev-d-shim-snickerdoodle-u-boot
-	url = https://github.com/LincolnCB/rev-d-shim-snickerdoodle-u-boot.git
-[submodule "snickerdoodle_src/rev-d-shim-snickerdoodle-linux"]
-	path = boards/snickerdoodle_black/linux_src/rev-d-shim-snickerdoodle-linux
-	url = https://github.com/LincolnCB/rev-d-shim-snickerdoodle-linux.git
