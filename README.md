@@ -103,5 +103,5 @@ rev_d_shim/
 ├── modules/                              - Custom modules used in other cores
 ├── projects/                             - Files/scripts to build particular projects
 ├── scripts/                              - Scripts used in building projects
-├── README.md                             - This file
+└── README.md                             - This file
 ```
