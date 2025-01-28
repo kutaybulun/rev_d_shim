@@ -1,0 +1,50 @@
+Shim playback
+- 50 kHz DAC sampling rate. 
+	- Each 8ch DAC gets an update every 20$\mu$s.
+	- One update is a 8 24-bit command words. $\frac{24 \times 8}{20 \text{ }\mu \text{s}}=9.6 \text{ MHz}$ SPI clock minimum
+	- Preload DAC before first trigger, trigger goes to ~LDACn and starts next cycle
+- 50 kHz ADC sampling rate
+	- Same deal
+- Software defined SPI clock
+	- Frequency and phase defined relative to 10 MHz scanner input clock
+	- Handle clock domain crossings and proper update rate
+- FIFO streaming to and from DMA (and to/from SD card)
+	- $\frac{16 \times 8}{20 \text{ ms}}=6.4 \text{ Mbps}$ stream in and out minimum, can be averaged over 25ms
+	- Store 25ms of DAC on-chip (160 kbit) of memory buffer (for 32x1024 bit blocks, each DAC would use 5 BRAM blocks)
+- Static shimming functionality
+	- Use the extra 4 bits per 32 bits in the BRAM width to indicate trigger breaks.
+	- Still load the next commands, just don't send LDAC. 
+- Buffer drain
+	- Doesn't need to be done fast, 1 second is perfectly fine during scan breaks
+	- Triggered from software or hardware
+- Trigger core
+	- Software-defined trigger lockout
+	- Force trigger from PS
+- Waveform is generated/loaded beforehand
+- CLI static shimming is entirely software on top of this PL functionality, PS to PL delay is swamped by human reaction time
+- Emergency stop line
+	- Can be activated through interrupts in software (probably Ctrl+C)
+	- Can be activated by PL safety cores (below)
+	- Can send interrupt TO software in case of a PL core initiating
+	- Triggers Shutdown_Force pin
+	- Latches high until reset signal sent
+	- Activate from empty DAC buffer? Can we make an error code register for different crash statuses?
+- E-stop reset
+	- Does a buffer drain
+	- Resets the E-stop line and sends ~shutdown_reset
+- Safety cores
+	- Integrator: Integrates both DAC and ADC separately over (software-defined? pre-set?) time relative to software-defined total threshold, triggers E-stop if passed
+	- Shutdown sense: Cycles shutdown_sense_sel bits to strobe shutdown_sense across all DACs, triggering E-stop if any DAC has thermally latched
+
+Milestones:
+- Parity with original OCRA code -- DAC playback works with load on the bench
+- Noise test
+- New trigger core with force trigger from software (for debugging, static shim)
+- DAC streaming with DMA on the bench
+- ADC streaming with DMA on the bench
+- Buffer drain
+- E-stop system with interrupt from software
+- Software-defined SPI clock
+- E-stop error codes and interrupt to software
+- Integrator
+- Shutdown sense
