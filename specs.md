@@ -1,7 +1,7 @@
 Shim playback
 - 50 kHz DAC sampling rate. 
 	- Each 8ch DAC gets an update every 20$\mu$s.
-	- One update is a 8 24-bit command words. $\frac{24 \times 8}{20 \text{ }\mu \text{s}}=9.6 \text{ MHz}$ SPI clock minimum
+	- One update is a 8 24-bit command words. $\frac{24 \times 8}{20 \,\mu \text{s}}=9.6 \text{ MHz}$ SPI clock minimum
 	- Preload DAC before first trigger, trigger goes to ~LDACn and starts next cycle
 - 50 kHz ADC sampling rate
 	- Same deal
@@ -9,7 +9,7 @@ Shim playback
 	- Frequency and phase defined relative to 10 MHz scanner input clock
 	- Handle clock domain crossings and proper update rate
 - FIFO streaming to and from DMA (and to/from SD card)
-	- $\frac{16 \times 8}{20 \text{ }\mu \text{s}}=6.4 \text{ Mbps}$ stream in and out minimum, can be averaged over 25ms
+	- $\frac{16 \times 8}{20 \,\mu \text{s}}=6.4 \text{ Mbps}$ stream in and out minimum, can be averaged over 25ms
 	- Store 25ms of DAC on-chip (160 kbit) of memory buffer (for 32x1024 bit blocks, each DAC would use 5 BRAM blocks)
 - Static shimming functionality
 	- Use the extra 4 bits per 32 bits in the BRAM width to indicate trigger breaks.
@@ -38,13 +38,14 @@ Shim playback
 
 Milestones:
 - Parity with original OCRA code -- DAC playback works with load on the bench
-- Noise test --> RF noise floor variance changes less than 2% when DACs and ADCs operate during image encode readout window
+- *Experiment*: Noise test --> RF noise floor variance changes less than 2% when DACs and ADCs operate during image encode readout window
 - New trigger core with force trigger from software (for debugging, static shim).
-- Successfully update slice-by-slice shims in 2D EPI acquisitions and verify that currents settle in < 1ms and cause no image detectable image artifacts
-- Play out an arbitrary waveform during an MRI acquisition using a local encoding coil and verify that image encoding occurs as expected.  For example, play out trapezoid diffusion encode waveforms in a triggered 2D spin-echo EPI sequence (classic Stejskal-Tanner experiment).
-- Create Pulseq acquisition with chemical shift imaging to map the applied field field in phantom at every point during readout to measure the field and verify that it follows the current accurately; use for image recon calibration if needed.
 - DAC streaming with DMA on the bench
+- *Experiment*: Successfully update slice-by-slice shims in 2D EPI acquisitions and verify that currents settle in < 1ms and cause no image detectable image artifacts
+- *Experiment*: Play out an arbitrary waveform during an MRI acquisition using a local encoding coil and verify that image encoding occurs as expected.  For example, play out trapezoid diffusion encode waveforms in a triggered 2D spin-echo EPI sequence (classic Stejskal-Tanner experiment).
+- *Experiment*: Create Pulseq acquisition with chemical shift imaging to map the applied field field in phantom at every point during readout to measure the field and verify that it follows the current accurately; use for image recon calibration if needed.
 - ADC streaming with DMA on the bench
+- Calibration using ADCs
 - Buffer drain
 - E-stop system with interrupt from software
 - Software-defined SPI clock 
