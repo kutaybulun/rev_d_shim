@@ -9,7 +9,7 @@ Shim playback
 	- Frequency and phase defined relative to 10 MHz scanner input clock
 	- Handle clock domain crossings and proper update rate
 - FIFO streaming to and from DMA (and to/from SD card)
-	- $\frac{16 \times 8}{20 \text{ ms}}=6.4 \text{ Mbps}$ stream in and out minimum, can be averaged over 25ms
+	- $\frac{16 \times 8}{20 \text{ }\mu \text{s}}=6.4 \text{ Mbps}$ stream in and out minimum, can be averaged over 25ms
 	- Store 25ms of DAC on-chip (160 kbit) of memory buffer (for 32x1024 bit blocks, each DAC would use 5 BRAM blocks)
 - Static shimming functionality
 	- Use the extra 4 bits per 32 bits in the BRAM width to indicate trigger breaks.
