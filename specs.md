@@ -69,12 +69,15 @@ Software goals:
 		- Static shim: simple commands to manually set shim levels
 		- Start stream: connect a DAC waveform input file and ADC sample output file and start a second stream that keeps the DMA flowing
 		- Stop stream: stop the streams and reset the system
+		- Read temp: Read temperatures off of I2C bus
 - Backup CLI safety tool that just sends a shutdown in case the first crashes in a weird way
 
 Milestones:
 - Parity with original OCRA code -- DAC playback works with load on the bench
 - Software-defined SPI clock
 - Trigger core
+- E-stop system with input from software interrupt
+- E-stop error codes and interrupt to software
 - **Experiment:** Noise test --> RF noise floor variance changes less than 2% when DACs and ADCs operate during image encode readout window
 - New trigger core with force trigger from software (for debugging, static shim).
 - DAC streaming with DMA on the bench
@@ -84,7 +87,5 @@ Milestones:
 - ADC streaming with DMA on the bench
 - Buffer drain
 - Calibration core with software tool
-- E-stop system with input from software interrupt
-- E-stop error codes and interrupt to software
 - Integrator
 - Shutdown sense
