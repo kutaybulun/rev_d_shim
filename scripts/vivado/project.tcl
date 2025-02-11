@@ -150,19 +150,6 @@ proc addr {offset range intf_pin} {
   assign_bd_address -offset $offset -range $range $segment
 }
 
-# Automate the creation of an AXI interconnect. This creates an intermediary AXI core.
-#  offset: offset of the address
-#  range: range of the address
-#  intf_pin: name of the interface pin to connect to the AXI interconnect
-#  master: name of the master to connect to the AXI interconnect
-#   Note: "master" needs to be an absolute path with a "/" prefix, "inf_pin" does not
-proc auto_connect_axi {offset range intf_pin master} {
-  set object [get_bd_intf_pins $intf_pin]
-  set config [list Master $master Clk Auto]
-  apply_bd_automation -rule xilinx.com:bd_rule:axi4 -config $config $object
-  addr $offset $range $intf_pin
-}
-
 ##############################################################################
 ## End of block design helper procedures
 ##############################################################################
