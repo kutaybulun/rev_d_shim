@@ -1,6 +1,8 @@
 #############################################
 ## Variables
 #############################################
+## Required environment variable inputs to the Makefile
+#############################################
 
 # You need to set PROJECT and BOARD to the project and board you want to build
 # These can be set on the command line:
@@ -10,9 +12,14 @@
 PROJECT ?= example_axi_hub
 BOARD ?= snickerdoodle_black
 
+#############################################
+
+
 
 #############################################
 ## Initialization
+#############################################
+## Some scripts to initialize the environment and check for necessary tools/src
 #############################################
 
 # Check for the REV D environment variable
@@ -34,8 +41,11 @@ endif
 ifneq (true, $(CLEAN_ONLY)) # Clean check
 
 # Check that the project and board exist, and that the necessary files are present
+ifeq ($(),$(wildcard boards/$(BOARD)/board_files/))
+$(error Board files for board "$(BOARD)": "boards/$(BOARD)/board_files/[version]" does not exist)
+endif
 ifeq ($(),$(wildcard boards/$(BOARD)/board_config.json))
-$(error Board "$(BOARD)" or the corresponding board configuration file "boards/$(BOARD)/board_config.json" does not exist)
+$(error Board configuration file for board "$(BOARD)": "boards/$(BOARD)/board_config.json" does not exist)
 endif
 ifeq ($(),$(wildcard projects/$(PROJECT)))
 $(error Project "$(PROJECT)" does not exist -- missing folder "projects/$(PROJECT)")
@@ -70,20 +80,21 @@ VIVADO = vivado -nolog -nojournal -mode batch
 XSCT = xsct
 RM = rm -rf
 
+#############################################
+
+
+
+#############################################
+## Make-specific targets (clean, all, .PHONY, etc.)
+#############################################
+
 # Files not to delete on half-completion (.PRECIOUS is a special target that tells make not to delete these files)
 .PRECIOUS: tmp/cores/% tmp/%.xpr tmp/%.bit
 
 # Targets that aren't real files
 .PHONY: all clean cleanall bit sd rootfs boot cores xpr xsa
 
-#############################################
-
-
-
-#############################################
-## Generic and clean targets
-#############################################
-# Default target
+# Default target is the first listed
 all: sd
 
 # Remove a single project's intermediate and temporary files
@@ -106,17 +117,18 @@ cleanall: clean
 
 
 #############################################
-## Output targets
+## Custom output targets (the important output stages)
 #############################################
 
-# The bitstream file
-# Built from the Vivado project
+# All the files necessary for a bootable SD card. See PetaLinux UG1144 for info
+# https://docs.amd.com/r/en-US/ug1144-petalinux-tools-reference-guide/Preparing-the-SD-Card
+sd: boot rootfs
+
+# The bitstream file (system.bit)
+# Built from the Vivado project (project.xpr)
 bit: tmp/$(BOARD)/$(PROJECT)/bitstream.bit
 	mkdir -p out/$(BOARD)/$(PROJECT)
 	cp tmp/$(BOARD)/$(PROJECT)/bitstream.bit out/$(BOARD)/$(PROJECT)/system.bit
-
-# All the files necessary for a bootable SD card
-sd: boot rootfs
 
 # The compressed root filesystem
 # Made in the petalinux build
@@ -150,7 +162,7 @@ boot: tmp/$(BOARD)/$(PROJECT)/petalinux/images/linux/rootfs.tar.gz
 
 
 #############################################
-## Intermediate targets
+## Custom intermediate targets (could be used directly for testing)
 #############################################
 
 # All the cores necessary for the project
@@ -173,7 +185,7 @@ xsa: tmp/$(BOARD)/$(PROJECT)/hw_def.xsa
 
 
 #############################################
-## Specific targets
+## Specific targets (don't recommend using these directly)
 #############################################
 
 # Core RTL needs to be packaged to be used in the block design flow
