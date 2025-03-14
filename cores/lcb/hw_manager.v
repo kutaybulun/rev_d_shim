@@ -2,6 +2,7 @@
 
 module hw_manager #(
   // Delays for the various timeouts, default to 1 second at 250 MHz
+  parameter integer POWERON_WAIT   = 250000000, // Delay after releasing "shutdown_force" and "n_shutdown_rst"
   parameter integer BUF_LOAD_WAIT  = 250000000, // Full buffer load from DMA after "dma_en" is set
   parameter integer SPI_START_WAIT = 250000000, // SPI start after "spi_en" is set
   parameter integer SPI_STOP_WAIT  = 250000000  // SPI stop after "spi_en" is cleared
@@ -28,93 +29,87 @@ module hw_manager #(
   output  reg           sys_rst,        // System reset
   output  reg           dma_en,         // DMA enable
   output  reg           spi_en,         // SPI subsystem enable
-  output  reg           n_sck_pow,      // SPI clock power (negated)
+  output  reg           trig_en,        // Trigger enable
   output  reg           shutdown_force, // Shutdown force
   output  reg           n_shutdown_rst, // Shutdown reset (negated)
-  output  reg   [31:0]  status_word     // Status - Status word
+  output  wire  [31:0]  status_word,    // Status - Status word
+  output  reg           ps_interrupt    // Interrupt signal
 );
 
   // Internal signals
-  reg [2:0]  state;       // State machine state
+  reg [3:0]  state;       // State machine state
   reg [31:0] timer;       // Timer for various timeouts
-  reg        prev_sys_en; // Previous system enable (for rising edge detection)
-  reg        running;     // Status - Running
-  reg        stopping;    // Status - Stopping
-  reg        dma_running; // Status - DMA running
-  reg        halted;      // Status - Halted
   reg [2:0]  board_num;   // Status - Board number (if applicable)
-  reg [23:0] status_code; // Status - Status code
+  reg [24:0] status_code; // Status - Status code
 
   // Concatenated status word
-  assign status_word = {running, stopping, dma_running, spi_running, halted, board_num, status_code};
+  assign status_word = {board_num, status_code, state};
 
   // State encoding
-  localparam  IDLE      = 3'd0,
-              STARTING  = 3'd1,
-              START_DMA = 3'd2,
-              START_SPI = 3'd3,
-              RUNNING   = 3'd4,
-              STOPPING  = 3'd5,
-              HALTED    = 3'd6;
+  localparam  IDLE      = 4'd1,
+              POWERON   = 4'd2,
+              START_DMA = 4'd3,
+              START_SPI = 4'd4,
+              RUNNING   = 4'd5,
+              HALTED    = 4'd6;
 
   // Status codes
-  localparam  STATUS_OK                   = 24'h0,
-              STATUS_PS_SHUTDOWN          = 24'h1,
-              STATUS_DAC_BUF_FILL_TIMEOUT = 24'h2,
-              STATUS_SPI_START_TIMEOUT    = 24'h3,
-              STATUS_OVER_THRESH          = 24'h4,
-              STATUS_SHUTDOWN_SENSE       = 24'h5,
-              STATUS_EXT_SHUTDOWN         = 24'h6,
-              STATUS_DAC_EMPTY_READ       = 24'h7,
-              STATUS_ADC_FULL_WRITE       = 24'h8,
-              STATUS_PREMAT_TRIG          = 24'h9,
-              STATUS_PREMAT_DAC_DIV       = 24'hA,
-              STATUS_PREMAT_ADC_DIV       = 24'hB;
+  localparam  STATUS_OK                   = 25'h1,
+              STATUS_PS_SHUTDOWN          = 25'h2,
+              STATUS_DAC_BUF_FILL_TIMEOUT = 25'h3,
+              STATUS_SPI_START_TIMEOUT    = 25'h4,
+              STATUS_OVER_THRESH          = 25'h5,
+              STATUS_SHUTDOWN_SENSE       = 25'h6,
+              STATUS_EXT_SHUTDOWN         = 25'h7,
+              STATUS_DAC_EMPTY_READ       = 25'h8,
+              STATUS_ADC_FULL_WRITE       = 25'h9,
+              STATUS_PREMAT_TRIG          = 25'hA,
+              STATUS_PREMAT_DAC_DIV       = 25'hB,
+              STATUS_PREMAT_ADC_DIV       = 25'hC;
 
   // Main state machine
   always @(posedge clk or posedge rst) begin
     if (rst) begin
       state <= IDLE;
+      timer <= 0;
       sys_rst <= 1;
-      prev_sys_en <= 1;
-      dma_en <= 0;
-      spi_en <= 0;
-      n_sclk_pow <= 1;
       shutdown_force <= 1;
       n_shutdown_rst <= 1;
-      halted <= 0;
+      dma_en <= 0;
+      spi_en <= 0;
+      trig_en <= 0;
       status_code <= STATUS_OK;
       board_num <= 0;
-      timer <= 0;
-      stopping <= 0;
-      running <= 0;
+      ps_interrupt <= 0;
     end else begin
 
       // State machine
       case (state)
 
-        // Idle state, hardware shut down, waiting for system enable to go high from low
+        // Idle state, hardware shut down, waiting for system enable to go high
         // When enabled, remove the system reset and shutdown force, reset the shutdown
         IDLE: begin
-          if (sys_en & ~prev_sys_en) begin
-            state <= STARTING;
-            prev_sys_en <= 1;
-            running <= 1;
+          if (sys_en) begin
+            state <= POWERON;
+            timer <= 0;
             sys_rst <= 0;
             shutdown_force <= 0;
             n_shutdown_rst <= 0;
-          end else begin
-            prev_sys_en <= sys_en;
-          end // if (sys_en & ~prev_sys_en)
+          end // if (sys_en)
+          
         end // IDLE
 
-        // Turn off the shutdown reset, begin loading the DMA buffer
-        STARTING: begin
-          state <= START_DMA;
-          n_shutdown_rst <= 1;
-          dma_en <= 1;
-          timer <= 0;
-        end
+        // Hold the shutdown latch reset high (n_shutdown_rst low) while we wait for the system to power on
+        // Once the power is on, release the shutdown latch reset and start the DMA
+        POWERON: begin
+          if (timer >= POWERON_WAIT) begin
+            state <= START_DMA;
+            timer <= 0;
+            n_shutdown_rst <= 1;
+          end else begin
+            timer <= timer + 1;
+          end // if (timer >= POWERON_WAIT)
+        end // POWERON
 
         // Wait for the DAC buffer to fill from the DMA before starting the SPI
         // If the buffer doesn't fill in time, halt the system
@@ -122,18 +117,15 @@ module hw_manager #(
           if (dac_buf_full) begin
             state <= START_SPI;
             timer <= 0;
-            dma_running <= 1;
             spi_en <= 1;
-            n_sclk_pow <= 0;
-          end else if (timer > BUF_LOAD_WAIT) begin
+          end else if (timer >= BUF_LOAD_WAIT) begin
             state <= HALTED;
             timer <= 0;
-            halted <= 1;
-            status_code <= STATUS_DAC_BUF_FILL_TIMEOUT;
-            running <= 0;
-            dma_en <= 0;
             sys_rst <= 1;
             shutdown_force <= 1;
+            dma_en <= 0;
+            status_code <= STATUS_DAC_BUF_FILL_TIMEOUT;
+            ps_interrupt <= 1;
           end else begin
             timer <= timer + 1;
           end // if (dac_buf_full)
@@ -145,18 +137,17 @@ module hw_manager #(
           if (spi_running) begin
             state <= RUNNING;
             timer <= 0;
-          end else if (timer > SPI_START_WAIT) begin
+            trig_en <= 1;
+            ps_interrupt <= 1;
+          end else if (timer >= SPI_START_WAIT) begin
             state <= HALTED;
             timer <= 0;
-            halted <= 1;
-            status_code <= STATUS_SPI_START_TIMEOUT;
-            running <= 0;
-            dma_en <= 0;
-            dma_running <= 0;
-            spi_en <= 0;
-            n_sclk_pow <= 1;
             sys_rst <= 1;
             shutdown_force <= 1;
+            dma_en <= 0;
+            spi_en <= 0;
+            status_code <= STATUS_SPI_START_TIMEOUT;
+            ps_interrupt <= 1;
           end else begin
             timer <= timer + 1;
           end // if (spi_running)
@@ -164,12 +155,22 @@ module hw_manager #(
 
         // Main running state, check for various error conditions or shutdowns
         RUNNING: begin
+          // Reset the interrupt if needed
+          if (ps_interrupt) begin
+            ps_interrupt <= 0;
+          end // if (ps_interrupt)
+
+          // Check for various error conditions or shutdowns
           if (!sys_en || over_thresh || shutdown_sense || ext_shutdown || dac_empty_read || adc_full_write || premat_trig || premat_dac_div || premat_adc_div) begin
-            // Set the status code and begin the shutdown process
-            state <= STOPPING;
+            // Set the status code and halt the system
+            state <= HALTED;
             timer <= 0;
-            stopping <= 1;
+            sys_rst <= 1;
+            shutdown_force <= 1;
+            dma_en <= 0;
             spi_en <= 0;
+            trig_en <= 0;
+            ps_interrupt <= 1;
 
             // Processing system shutdown
             if (!sys_en) status_code <= STATUS_PS_SHUTDOWN;
@@ -258,41 +259,17 @@ module hw_manager #(
           end // if (!sys_en || over_thresh || shutdown_sense || ext_shutdown || dac_empty_read || adc_full_write || premat_trig || premat_dac_div || premat_adc_div)
         end // RUNNING
 
-        // Stop the system and wait for the SPI subsystem to stop
-        STOPPING: begin
-          if (!spi_running) begin
-            state <= IDLE;
-            timer <= 0;
-            running <= 0;
-            stopping <= 0;
-            sys_rst <= 1;
-            dma_en <= 0;
-            dma_running <= 0;
-            n_sclk_pow <= 1;
-            shutdown_force <= 1;
-          end else if (timer > SPI_STOP_WAIT) begin
-            state <= HALTED;
-            timer <= 0;
-            halted <= 1;
-            running <= 0;
-            stopping <= 0;
-            dma_en <= 0;
-            dma_running <= 0;
-            n_sclk_pow <= 1;
-            sys_rst <= 1;
-            shutdown_force <= 1;
-          end else begin
-            timer <= timer + 1;
-          end
-        end // STOPPING
-
         // Wait in the halted state until the system enable goes low
         HALTED: begin
+          // Reset the interrupt if needed
+          if (ps_interrupt) begin
+            ps_interrupt <= 0;
+          end // if (ps_interrupt)
+          // If the system enable goes low, go to IDLE and clear the status code
           if (~sys_en) begin 
             state <= IDLE;
-            halted <= 0;
             status_code <= STATUS_OK;
-            prev_sys_en <= 0;
+            board_num <= 0;
           end
         end // HALTED
 

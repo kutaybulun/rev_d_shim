@@ -9,15 +9,15 @@ set board_ver [lindex $argv 1]
 set project_name [lindex $argv 2]
 
 # Set the temporary directory for the project
-set tmp_dir tmp/${board_name}/${board_ver}/${project_name}
+set tmp_dir tmp/$board_name/$board_ver/$project_name
 
 ## Extract the part information from the board name
 # Read the json config for the board into a dict
-set board_cfg_fname boards/${board_name}/board_config.json
+set board_cfg_fname boards/$board_name/board_config.json
 if {[file exists $board_cfg_fname]} {
     set board_cfg_fd [open $board_cfg_fname "r"]
 } else {
-    error "Board configuration file ${board_cfg_fname} missing."
+    error "Board configuration file $board_cfg_fname missing."
 }
 set board_cfg_str [read $board_cfg_fd]
 close $board_cfg_fd
@@ -30,10 +30,10 @@ set board_part [dict get $board_cfg_dict board_part]
 
 ## Initialize the project and dependencies
 # Clear out old build files
-file delete -force ${tmp_dir}/project.cache ${tmp_dir}/project.gen ${tmp_dir}/project.hw ${tmp_dir}/project.ip_user_files ${tmp_dir}/project.runs ${tmp_dir}/project.sim ${tmp_dir}/project.srcs ${tmp_dir}/project.xpr
+file delete -force $tmp_dir/project.cache $tmp_dir/project.gen $tmp_dir/project.hw $tmp_dir/project.ip_user_files $tmp_dir/project.runs $tmp_dir/project.sim $tmp_dir/project.srcs $tmp_dir/project.xpr
 
 # Create the project
-create_project -part $part_name project ${tmp_dir}
+create_project -part $part_name project $tmp_dir
 
 # Set the board part
 set_property BOARD_PART $board_part [current_project]
@@ -192,7 +192,7 @@ generate_target all $system
 make_wrapper -files $system -top
 
 # Store the wrapper file name
-set wrapper [fileutil::findByPattern ${tmp_dir}/project.gen system_wrapper.v]
+set wrapper [fileutil::findByPattern $tmp_dir/project.gen system_wrapper.v]
 
 # Add the wrapper to the project and make it the top module
 add_files -norecurse $wrapper
@@ -205,7 +205,7 @@ if {[llength $files] > 0} {
 }
 
 # Load all XDC constraint files specific to the board from the project folder
-set files [glob -nocomplain projects/$project_name/cfg/{$board_name}/xdc/*.xdc]
+set files [glob -nocomplain projects/$project_name/cfg/$board_name/$board_ver/xdc/*.xdc]
 if {[llength $files] > 0} {
   add_files -norecurse -fileset constrs_1 $files
 }
