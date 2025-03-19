@@ -1,11 +1,12 @@
 `timescale 1 ns / 1 ps
 
 module hw_manager #(
-  // Delays for the various timeouts, default to 1 second at 250 MHz
-  parameter integer POWERON_WAIT   = 250000000, // Delay after releasing "shutdown_force" and "n_shutdown_rst"
+  // Delays for the various timeouts, default clock frequency is 250 MHz
+  parameter integer SHUTDOWN_FORCE_DELAY = 2500000,  //  10 ms, Delay after releasing "shutdown_force" before pulsing "n_shutdown_rst"
+  parameter integer SHUTDOWN_RESET_PULSE = 25000,    // 100 us, Pulse width for "n_shutdown_rst"
+  parameter integer SHUTDOWN_RESET_DELAY = 25000000, // 100 ms, Delay after pulsing "n_shutdown_rst" before starting the system
   parameter integer BUF_LOAD_WAIT  = 250000000, // Full buffer load from DMA after "dma_en" is set
-  parameter integer SPI_START_WAIT = 250000000, // SPI start after "spi_en" is set
-  parameter integer SPI_STOP_WAIT  = 250000000  // SPI stop after "spi_en" is cleared
+  parameter integer SPI_START_WAIT = 250000000  // SPI start after "spi_en" is set
 )
 (
   input   wire          clk,
@@ -16,9 +17,23 @@ module hw_manager #(
   input   wire          dac_buf_full,   // DAC buffer full
   input   wire          spi_running,    // SPI running
   input   wire          ext_shutdown,   // External shutdown
+  // Configuration values
+  input   wire          trig_lockout_oob,     // Trigger lockout out of bounds
+  input   wire          cal_offset_oob,       // Calibration offset out of bounds
+  input   wire          dac_divider_oob,      // DAC divider out of bounds
+  input   wire          integ_thresh_avg_oob, // Integrator threshold average out of bounds
+  input   wire          integ_window_oob,     // Integrator window out of bounds
+  input   wire          lock_viol,      // Configuration lock violation
+  // Shutdown sense
   input   wire          shutdown_sense, // Shutdown sense
   input   wire  [ 2:0]  sense_num,      // Shutdown sense number
+  // Integrator
   input   wire  [ 7:0]  over_thresh,    // Over threshold (per board)
+  input   wire  [ 7:0]  dac_thresh_underflow, // DAC threshold core FIFO underflow (per board)
+  input   wire  [ 7:0]  dac_thresh_overflow,  // DAC threshold core FIFO overflow (per board)
+  input   wire  [ 7:0]  adc_thresh_underflow, // ADC threshold core FIFO underflow (per board)
+  input   wire  [ 7:0]  adc_thresh_overflow,  // ADC threshold core FIFO overflow (per board)
+  // DAC/ADC
   input   wire  [ 7:0]  dac_buf_underflow, // DAC buffer underflow (per board)
   input   wire  [ 7:0]  dac_buf_overflow,  // DAC buffer overflow (per board)
   input   wire  [ 7:0]  adc_buf_underflow, // ADC buffer underflow (per board)
@@ -26,14 +41,11 @@ module hw_manager #(
   input   wire  [ 7:0]  premat_trig,    // Premature trigger (per board)
   input   wire  [ 7:0]  premat_dac_div, // Premature DAC division (per board)
   input   wire  [ 7:0]  premat_adc_div, // Premature ADC division (per board)
-  input   wire  [ 7:0]  dac_thresh_underflow, // DAC threshold core FIFO underflow (per board)
-  input   wire  [ 7:0]  dac_thresh_overflow, // DAC threshold core FIFO overflow (per board)
-  input   wire  [ 7:0]  adc_thresh_underflow, // ADC threshold core FIFO underflow (per board)
-  input   wire  [ 7:0]  adc_thresh_overflow, // ADC threshold core FIFO overflow (per board)
 
 
   // Outputs
   output  reg           sys_rst,        // System reset
+  output  reg           unlock_cfg,     // Lock configuration
   output  reg           dma_en,         // DMA enable
   output  reg           spi_en,         // SPI subsystem enable
   output  reg           trig_en,        // Trigger enable
@@ -53,32 +65,40 @@ module hw_manager #(
   assign status_word = {board_num, status_code, state};
 
   // State encoding
-  localparam  IDLE      = 4'd1,
-              POWERON   = 4'd2,
-              START_DMA = 4'd3,
-              START_SPI = 4'd4,
-              RUNNING   = 4'd5,
-              HALTED    = 4'd6;
+  localparam  IDLE         = 4'd1,
+              RELEASE_SD_F = 4'd2,
+              PULSE_SD_RST = 4'd3,
+              SD_RST_DELAY = 4'd4,
+              START_DMA    = 4'd5,
+              START_SPI    = 4'd6,
+              RUNNING      = 4'd7,
+              HALTED       = 4'd8;
 
   // Status codes
   localparam  STATUS_OK                   = 25'd1,
               STATUS_PS_SHUTDOWN          = 25'd2,
-              STATUS_DAC_BUF_FILL_TIMEOUT = 25'd3,
-              STATUS_SPI_START_TIMEOUT    = 25'd4,
-              STATUS_OVER_THRESH          = 25'd5,
-              STATUS_SHUTDOWN_SENSE       = 25'd6,
-              STATUS_EXT_SHUTDOWN         = 25'd7,
-              STATUS_DAC_BUF_UNDERFLOW    = 25'd8,
-              STATUS_DAC_BUF_OVERFLOW     = 25'd9,
-              STATUS_ADC_BUF_UNDERFLOW    = 25'd10,
-              STATUS_ADC_BUF_OVERFLOW     = 25'd11,
-              STATUS_PREMAT_TRIG          = 25'd12,
-              STATUS_PREMAT_DAC_DIV       = 25'd13,
-              STATUS_PREMAT_ADC_DIV       = 25'd14,
-              STATUS_DAC_THRESH_UNDERFLOW = 25'd15,
-              STATUS_DAC_THRESH_OVERFLOW  = 25'd16,
-              STATUS_ADC_THRESH_UNDERFLOW = 25'd17,
-              STATUS_ADC_THRESH_OVERFLOW  = 25'd18;
+              STATUS_TRIG_LOCKOUT_OOB     = 25'd3,
+              STATUS_CAL_OFFSET_OOB       = 25'd4,
+              STATUS_DAC_DIVIDER_OOB      = 25'd5,
+              STATUS_INTEG_THRESH_AVG_OOB = 25'd6,
+              STATUS_INTEG_WINDOW_OOB     = 25'd7,
+              STATUS_LOCK_VIOL            = 25'd8,
+              STATUS_SHUTDOWN_SENSE       = 25'd9,
+              STATUS_EXT_SHUTDOWN         = 25'd10,
+              STATUS_OVER_THRESH          = 25'd11,
+              STATUS_DAC_THRESH_UNDERFLOW = 25'd12,
+              STATUS_DAC_THRESH_OVERFLOW  = 25'd13,
+              STATUS_ADC_THRESH_UNDERFLOW = 25'd14,
+              STATUS_ADC_THRESH_OVERFLOW  = 25'd15,
+              STATUS_DAC_BUF_UNDERFLOW    = 25'd16,
+              STATUS_DAC_BUF_OVERFLOW     = 25'd17,
+              STATUS_ADC_BUF_UNDERFLOW    = 25'd18,
+              STATUS_ADC_BUF_OVERFLOW     = 25'd19,
+              STATUS_PREMAT_TRIG          = 25'd20,
+              STATUS_PREMAT_DAC_DIV       = 25'd21,
+              STATUS_PREMAT_ADC_DIV       = 25'd22,
+              STATUS_DAC_BUF_FILL_TIMEOUT = 25'd23,
+              STATUS_SPI_START_TIMEOUT    = 25'd24;
 
   // Main state machine
   always @(posedge clk or posedge rst) begin
@@ -88,6 +108,7 @@ module hw_manager #(
       sys_rst <= 1;
       shutdown_force <= 1;
       n_shutdown_rst <= 1;
+      unlock_cfg <= 1;
       dma_en <= 0;
       spi_en <= 0;
       trig_en <= 0;
@@ -100,29 +121,73 @@ module hw_manager #(
       case (state)
 
         // Idle state, hardware shut down, waiting for system enable to go high
-        // When enabled, remove the system reset and shutdown force, reset the shutdown
+        // When enabled, remove the system reset and shutdown force, lock the config registers
         IDLE: begin
           if (sys_en) begin
-            state <= POWERON;
-            timer <= 0;
-            sys_rst <= 0;
-            shutdown_force <= 0;
-            n_shutdown_rst <= 0;
+            // Check for out of bounds configuration values
+            if (trig_lockout_oob) begin // Trigger lockout out of bounds
+              state <= HALTED;
+              status_code <= STATUS_TRIG_LOCKOUT_OOB;
+              ps_interrupt <= 1;
+            end else if (cal_offset_oob) begin // Calibration offset out of bounds
+              state <= HALTED;
+              status_code <= STATUS_CAL_OFFSET_OOB;
+              ps_interrupt <= 1;
+            end else if (dac_divider_oob) begin // DAC divider out of bounds
+              state <= HALTED;
+              status_code <= STATUS_DAC_DIVIDER_OOB;
+              ps_interrupt <= 1;
+            end else if (integ_thresh_avg_oob) begin // Integrator threshold average out of bounds
+              state <= HALTED;
+              status_code <= STATUS_INTEG_THRESH_AVG_OOB;
+              ps_interrupt <= 1;
+            end else if (integ_window_oob) begin // Integrator window out of bounds
+              state <= HALTED;
+              status_code <= STATUS_INTEG_WINDOW_OOB;
+              ps_interrupt <= 1;
+            end else begin // Start bootup
+              state <= RELEASE_SD_F;
+              timer <= 0;
+              sys_rst <= 0;
+              unlock_cfg <= 0;
+              shutdown_force <= 0;
+            end
           end // if (sys_en)
           
         end // IDLE
 
-        // Hold the shutdown latch reset high (n_shutdown_rst low) while we wait for the system to power on
-        // Once the power is on, release the shutdown latch reset and start the DMA
-        POWERON: begin
-          if (timer >= POWERON_WAIT) begin
-            state <= START_DMA;
+        // Wait for a delay between releasing the shutdown force and pulsing the shutdown reset
+        RELEASE_SD_F: begin
+          if (timer >= SHUTDOWN_FORCE_DELAY) begin
+            state <= PULSE_SD_RST;
+            timer <= 0;
+            n_shutdown_rst <= 0;
+          end else begin
+            timer <= timer + 1;
+          end // if (timer >= SHUTDOWN_FORCE_DELAY)
+        end // RELEASE_SD_F
+
+        // Pulse the shutdown reset for a short time
+        PULSE_SD_RST: begin
+          if (timer >= SHUTDOWN_RESET_PULSE) begin
+            state <= SD_RST_DELAY;
             timer <= 0;
             n_shutdown_rst <= 1;
           end else begin
             timer <= timer + 1;
-          end // if (timer >= POWERON_WAIT)
-        end // POWERON
+          end // if (timer >= SHUTDOWN_RESET_PULSE)
+        end // PULSE_SD_RST
+
+        // Wait for a delay after pulsing the shutdown reset before starting the system
+        SD_RST_DELAY: begin
+          if (timer >= SHUTDOWN_RESET_DELAY) begin
+            state <= START_DMA;
+            timer <= 0;
+            dma_en <= 1;
+          end else begin
+            timer <= timer + 1;
+          end // if (timer >= SHUTDOWN_RESET_DELAY)
+        end // SD_RST_DELAY
 
         // Wait for the DAC buffer to fill from the DMA before starting the SPI
         // If the buffer doesn't fill in time, halt the system
@@ -175,20 +240,21 @@ module hw_manager #(
 
           // Error/halt state check
           if (!sys_en 
-              || over_thresh 
+              || lock_viol
               || shutdown_sense 
               || ext_shutdown 
+              || over_thresh 
+              || dac_thresh_underflow 
+              || dac_thresh_overflow 
+              || adc_thresh_underflow 
+              || adc_thresh_overflow 
               || dac_buf_underflow 
               || dac_buf_overflow 
-              || adc_buf_overflow 
               || adc_buf_underflow 
+              || adc_buf_overflow 
               || premat_trig 
               || premat_dac_div 
               || premat_adc_div
-              || dac_thresh_overflow
-              || adc_thresh_overflow
-              || dac_thresh_underflow
-              || adc_thresh_underflow
               ) begin
             // Set the status code and halt the system
             state <= HALTED;
@@ -203,11 +269,10 @@ module hw_manager #(
             // Processing system shutdown
             if (!sys_en) status_code <= STATUS_PS_SHUTDOWN;
 
-            // Integrator core over threshold
-            else if (over_thresh) begin
-              status_code <= STATUS_OVER_THRESH;
-              board_num <= extract_board_num(over_thresh);
-            end // if (over_thresh)
+            // Configuration lock violation
+            else if (lock_viol) begin
+              status_code <= STATUS_LOCK_VIOL;
+            end // if (lock_viol)
 
             // Hardware shutdown sense core detected a shutdown
             else if (shutdown_sense) begin
@@ -217,6 +282,36 @@ module hw_manager #(
 
             // External shutdown
             else if (ext_shutdown) status_code <= STATUS_EXT_SHUTDOWN;
+
+            // Integrator core over threshold
+            else if (over_thresh) begin
+              status_code <= STATUS_OVER_THRESH;
+              board_num <= extract_board_num(over_thresh);
+            end // if (over_thresh)
+
+            // DAC threshold core FIFO underflow
+            else if (dac_thresh_underflow) begin
+              status_code <= STATUS_DAC_THRESH_UNDERFLOW;
+              board_num <= extract_board_num(dac_thresh_underflow);
+            end // if (dac_thresh_underflow)
+
+            // DAC threshold core FIFO overflow
+            else if (dac_thresh_overflow) begin
+              status_code <= STATUS_DAC_THRESH_OVERFLOW;
+              board_num <= extract_board_num(dac_thresh_overflow);
+            end // if (dac_thresh_overflow)
+
+            // ADC threshold core FIFO underflow
+            else if (adc_thresh_underflow) begin
+              status_code <= STATUS_ADC_THRESH_UNDERFLOW;
+              board_num <= extract_board_num(adc_thresh_underflow);
+            end // if (adc_thresh_underflow)
+
+            // ADC threshold core FIFO overflow
+            else if (adc_thresh_overflow) begin
+              status_code <= STATUS_ADC_THRESH_OVERFLOW;
+              board_num <= extract_board_num(adc_thresh_overflow);
+            end // if (adc_thresh_overflow)
 
             // DAC buffer underflow
             else if (dac_buf_underflow) begin
@@ -260,30 +355,6 @@ module hw_manager #(
               board_num <= extract_board_num(premat_adc_div);
             end // if (premat_adc_div)
 
-            // DAC threshold core FIFO underflow
-            else if (dac_thresh_underflow) begin
-              status_code <= STATUS_DAC_THRESH_UNDERFLOW;
-              board_num <= extract_board_num(dac_thresh_underflow);
-            end // if (dac_thresh_underflow)
-
-            // DAC threshold core FIFO overflow
-            else if (dac_thresh_overflow) begin
-              status_code <= STATUS_DAC_THRESH_OVERFLOW;
-              board_num <= extract_board_num(dac_thresh_overflow);
-            end // if (dac_thresh_overflow)
-
-            // ADC threshold core FIFO underflow
-            else if (adc_thresh_underflow) begin
-              status_code <= STATUS_ADC_THRESH_UNDERFLOW;
-              board_num <= extract_board_num(adc_thresh_underflow);
-            end // if (adc_thresh_underflow)
-
-            // ADC threshold core FIFO overflow
-            else if (adc_thresh_overflow) begin
-              status_code <= STATUS_ADC_THRESH_OVERFLOW;
-              board_num <= extract_board_num(adc_thresh_overflow);
-            end // if (adc_thresh_overflow)
-
           end // Error/halt state check
         end // RUNNING
 
@@ -298,6 +369,7 @@ module hw_manager #(
             state <= IDLE;
             status_code <= STATUS_OK;
             board_num <= 0;
+            unlock_cfg <= 1;
           end
         end // HALTED
 
