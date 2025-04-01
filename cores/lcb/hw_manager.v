@@ -13,9 +13,9 @@ module hw_manager #(
   input   wire          rst,
 
   // Inputs
-  input   wire          sys_en,         // System enable
-  input   wire          dac_buf_full,   // DAC buffer full
-  input   wire          spi_running,    // SPI running
+  input   wire          sys_en,         // System enable (turn the system on)
+  input   wire          dac_buf_loaded, // DAC buffer pre-loaded before starting the SPI subsystem
+  input   wire          spi_running,    // SPI system up and running
   input   wire          ext_shutdown,   // External shutdown
   // Configuration values
   input   wire          trig_lockout_oob,     // Trigger lockout out of bounds
@@ -23,6 +23,8 @@ module hw_manager #(
   input   wire          dac_divider_oob,      // DAC divider out of bounds
   input   wire          integ_thresh_avg_oob, // Integrator threshold average out of bounds
   input   wire          integ_window_oob,     // Integrator window out of bounds
+  input   wire          integ_en_oob,         // Integrator enable register out of bounds
+  input   wire          sys_en_oob,           // System enable register out of bounds
   input   wire          lock_viol,      // Configuration lock violation
   // Shutdown sense
   input   wire          shutdown_sense, // Shutdown sense
@@ -39,10 +41,10 @@ module hw_manager #(
   input   wire  [ 7:0]  dac_buf_overflow,  // DAC buffer overflow (per board)
   input   wire  [ 7:0]  adc_buf_underflow, // ADC buffer underflow (per board)
   input   wire  [ 7:0]  adc_buf_overflow,  // ADC buffer overflow (per board)
-  input   wire  [ 7:0]  premat_trig,    // Premature trigger (per board)
+  input   wire  [ 7:0]  premat_dac_trig, // Premature DAC trigger (per board)
+  input   wire  [ 7:0]  premat_adc_trig, // Premature ADC trigger (per board)
   input   wire  [ 7:0]  premat_dac_div, // Premature DAC division (per board)
   input   wire  [ 7:0]  premat_adc_div, // Premature ADC division (per board)
-
 
   // Outputs
   output  reg           sys_rst,        // System reset
@@ -83,24 +85,27 @@ module hw_manager #(
               STATUS_DAC_DIVIDER_OOB      = 25'd5,
               STATUS_INTEG_THRESH_AVG_OOB = 25'd6,
               STATUS_INTEG_WINDOW_OOB     = 25'd7,
-              STATUS_LOCK_VIOL            = 25'd8,
-              STATUS_SHUTDOWN_SENSE       = 25'd9,
-              STATUS_EXT_SHUTDOWN         = 25'd10,
-              STATUS_DAC_OVER_THRESH      = 25'd11,
-              STATUS_ADC_OVER_THRESH      = 25'd12,
-              STATUS_DAC_THRESH_UNDERFLOW = 25'd13,
-              STATUS_DAC_THRESH_OVERFLOW  = 25'd14,
-              STATUS_ADC_THRESH_UNDERFLOW = 25'd15,
-              STATUS_ADC_THRESH_OVERFLOW  = 25'd16,
-              STATUS_DAC_BUF_UNDERFLOW    = 25'd17,
-              STATUS_DAC_BUF_OVERFLOW     = 25'd18,
-              STATUS_ADC_BUF_UNDERFLOW    = 25'd19,
-              STATUS_ADC_BUF_OVERFLOW     = 25'd20,
-              STATUS_PREMAT_TRIG          = 25'd21,
-              STATUS_PREMAT_DAC_DIV       = 25'd22,
-              STATUS_PREMAT_ADC_DIV       = 25'd23,
-              STATUS_DAC_BUF_FILL_TIMEOUT = 25'd24,
-              STATUS_SPI_START_TIMEOUT    = 25'd25;
+              STATUS_INTEG_EN_OOB         = 25'd8,
+              STATUS_SYS_EN_OOB           = 25'd9,
+              STATUS_LOCK_VIOL            = 25'd10,
+              STATUS_SHUTDOWN_SENSE       = 25'd11,
+              STATUS_EXT_SHUTDOWN         = 25'd12,
+              STATUS_DAC_OVER_THRESH      = 25'd13,
+              STATUS_ADC_OVER_THRESH      = 25'd14,
+              STATUS_DAC_THRESH_UNDERFLOW = 25'd15,
+              STATUS_DAC_THRESH_OVERFLOW  = 25'd16,
+              STATUS_ADC_THRESH_UNDERFLOW = 25'd17,
+              STATUS_ADC_THRESH_OVERFLOW  = 25'd18,
+              STATUS_DAC_BUF_UNDERFLOW    = 25'd19,
+              STATUS_DAC_BUF_OVERFLOW     = 25'd20,
+              STATUS_ADC_BUF_UNDERFLOW    = 25'd21,
+              STATUS_ADC_BUF_OVERFLOW     = 25'd22,
+              STATUS_PREMAT_DAC_TRIG      = 25'd23,
+              STATUS_PREMAT_ADC_TRIG      = 25'd24,
+              STATUS_PREMAT_DAC_DIV       = 25'd25,
+              STATUS_PREMAT_ADC_DIV       = 25'd26,
+              STATUS_DAC_BUF_FILL_TIMEOUT = 25'd27,
+              STATUS_SPI_START_TIMEOUT    = 25'd28;
 
   // Main state machine
   always @(posedge clk or posedge rst) begin
@@ -146,6 +151,14 @@ module hw_manager #(
             end else if (integ_window_oob) begin // Integrator window out of bounds
               state <= HALTED;
               status_code <= STATUS_INTEG_WINDOW_OOB;
+              ps_interrupt <= 1;
+            end else if (integ_en_oob) begin // Integrator enable out of bounds
+              state <= HALTED;
+              status_code <= STATUS_INTEG_EN_OOB;
+              ps_interrupt <= 1;
+            end else if (sys_en_oob) begin // System enable out of bounds
+              state <= HALTED;
+              status_code <= STATUS_SYS_EN_OOB;
               ps_interrupt <= 1;
             end else begin // Start bootup
               state <= RELEASE_SD_F;
@@ -194,7 +207,7 @@ module hw_manager #(
         // Wait for the DAC buffer to fill from the DMA before starting the SPI
         // If the buffer doesn't fill in time, halt the system
         START_DMA: begin
-          if (dac_buf_full) begin
+          if (dac_buf_loaded) begin
             state <= START_SPI;
             timer <= 0;
             spi_en <= 1;
@@ -208,7 +221,7 @@ module hw_manager #(
             ps_interrupt <= 1;
           end else begin
             timer <= timer + 1;
-          end // if (dac_buf_full)
+          end // if (dac_buf_loaded)
         end // START_DMA
 
         // Wait for the SPI subsystem to start before running the system
@@ -255,7 +268,8 @@ module hw_manager #(
               || dac_buf_overflow 
               || adc_buf_underflow 
               || adc_buf_overflow 
-              || premat_trig 
+              || premat_dac_trig 
+              || premat_adc_trig 
               || premat_dac_div 
               || premat_adc_div
               ) begin
@@ -346,11 +360,17 @@ module hw_manager #(
               board_num <= extract_board_num(adc_buf_overflow);
             end // if (adc_buf_overflow)
 
-            // Premature trigger (trigger occurred before the DAC was pre-loaded and ready)
-            else if (premat_trig) begin
-              status_code <= STATUS_PREMAT_TRIG;
-              board_num <= extract_board_num(premat_trig);
-            end // if (premat_trig)
+            // Premature DAC trigger
+            else if (premat_dac_trig) begin
+              status_code <= STATUS_PREMAT_DAC_TRIG;
+              board_num <= extract_board_num(premat_dac_trig);
+            end // if (premat_dac_trig)
+
+            // Premature ADC trigger
+            else if (premat_adc_trig) begin
+              status_code <= STATUS_PREMAT_ADC_TRIG;
+              board_num <= extract_board_num(premat_adc_trig);
+            end // if (premat_adc_trig)
 
             // Premature DAC divider (DAC transfer took longer than the DAC divider)
             else if (premat_dac_div) begin
