@@ -95,10 +95,11 @@ RM = rm -rf
 # Default target is the first listed
 all: sd
 
-# Remove a single project's intermediate and temporary files
+# Remove a single project's intermediate and temporary files, including cores
 clean_project:
 	@./scripts/make/status.sh "CLEANING PROJECT: $(BOARD)/$(BOARD_VER)/$(PROJECT)"
 	$(RM) tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)
+	$(RM) -r $(addsuffix *, $(addprefix tmp/cores/, $(PROJECT_CORES)))
 
 # Remove all the intermediate and temporary files
 clean:
