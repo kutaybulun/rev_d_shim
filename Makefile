@@ -90,7 +90,7 @@ RM = rm -rf
 .PRECIOUS: tmp/cores/% tmp/%.xpr tmp/%.bit
 
 # Targets that aren't real files
-.PHONY: all clean clean_all bit sd rootfs boot cores xpr xsa
+.PHONY: all clean clean_project clean_all bit sd rootfs boot cores xpr xsa
 
 # Default target is the first listed
 all: sd
