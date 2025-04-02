@@ -27,8 +27,7 @@ module hw_manager #(
   input   wire          sys_en_oob,           // System enable register out of bounds
   input   wire          lock_viol,      // Configuration lock violation
   // Shutdown sense
-  input   wire          shutdown_sense, // Shutdown sense
-  input   wire  [ 2:0]  sense_num,      // Shutdown sense number
+  input   wire  [ 7:0]  shutdown_sense, // Shutdown sense (per board)
   // Integrator
   input   wire  [ 7:0]  dac_over_thresh, // DAC over threshold (per board)
   input   wire  [ 7:0]  adc_over_thresh, // ADC over threshold (per board)
@@ -294,7 +293,7 @@ module hw_manager #(
             // Hardware shutdown sense core detected a shutdown
             else if (shutdown_sense) begin
               status_code <= STATUS_SHUTDOWN_SENSE;
-              board_num <= sense_num;
+              board_num <= extract_board_num(shutdown_sense);
             end // if (shutdown_sense)
 
             // External shutdown

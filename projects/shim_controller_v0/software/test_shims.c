@@ -275,16 +275,6 @@ int main(int argc, char *argv[])
 
   fprintf(stdout, "board offset %d words\n", dbo);
 
-  // Cycle shutdown force to initialize the DAC
-  printf("Initializing the DAC...\n"); fflush(stdout);
-  *n_shutdown_force = 0x1;
-  // Sleep 200 ms to let the DACs boot up
-  usleep(200000);
-  // Set shutdown force again to reset the DACs
-  *n_shutdown_force = 0x0;
-  // Sleep 200ms to reset the DACs
-  usleep(200000);
-
   // Release the shutdown force
   printf("Releasing shutdown force...\n"); fflush(stdout);
   *n_shutdown_force = 0x1;
