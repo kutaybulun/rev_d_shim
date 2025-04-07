@@ -36,7 +36,7 @@ if {[llength $files] > 0} {
 }
 
 # Set the IP packaging path
-ipx::package_project -root_dir $tmp_path -import_files cores/$vendor_name/$core_name.v
+ipx::package_project -root_dir $tmp_path -import_files
 
 # Get the Vivado core
 set core [ipx::current_core]

@@ -102,7 +102,7 @@ all: sd
 clean_project:
 	@./scripts/make/status.sh "CLEANING PROJECT: $(BOARD)/$(BOARD_VER)/$(PROJECT)"
 	$(RM) tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)
-	$(RM) -r $(addsuffix *, $(addprefix tmp/cores/, $(PROJECT_CORES)))
+	$(RM) -r $(addsuffix *, $(addprefix tmp/user_cores/, $(PROJECT_CORES)))
 
 # Remove all the intermediate and temporary files
 clean:
@@ -172,7 +172,7 @@ boot: tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)/petalinux/images/linux/rootfs.tar.gz
 # The necessary cores for the specific project are extracted
 # 	from `block_design.tcl` (recursively by sub-modules)
 #		by `scripts/make/get_cores_from_tcl.sh`
-cores: $(addprefix tmp/cores/, $(PROJECT_CORES))
+cores: $(addprefix tmp/user_cores/, $(PROJECT_CORES))
 
 # The Xilinx project file
 # This file can be edited in Vivado to test TCL commands and changes
