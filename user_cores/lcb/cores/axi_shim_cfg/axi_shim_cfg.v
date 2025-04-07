@@ -282,8 +282,7 @@ module axi_shim_cfg #
     end
   end
 
-  // Write response
-
+  // Write response logic
   always @*
   begin
     int_bvalid_next = int_bvalid_reg;
