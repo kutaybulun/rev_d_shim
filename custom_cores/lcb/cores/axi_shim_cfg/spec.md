@@ -23,6 +23,10 @@ The `axi_shim_cfg` module provides a configurable interface for managing system 
     - `integ_thresh_avg`: 15-bit integration threshold average configuration.
     - `integ_window`: 32-bit integration window configuration.
     - `integ_en`: Integration enable signal.
+    - `min_addr_writer`: Minimum write address configuration.
+    - `min_addr_reader`: Minimum read address configuration.
+    - `sample_count_cfg_writer`: Maximum write count configuration.
+    - `sample_count_cfg_reader`: Maximum read count configuration.
     - `sys_en`: System enable signal.
     - `trig_lockout_oob`: Out-of-bounds signal for trigger lockout.
     - `cal_offset_oob`: Out-of-bounds signal for calibration offset.
@@ -30,6 +34,10 @@ The `axi_shim_cfg` module provides a configurable interface for managing system 
     - `integ_thresh_avg_oob`: Out-of-bounds signal for integration threshold average.
     - `integ_window_oob`: Out-of-bounds signal for integration window.
     - `integ_en_oob`: Out-of-bounds signal for integration enable.
+    - `min_addr_writer_oob`: Out-of-bounds signal for minimum write address.
+    - `min_addr_reader_oob`: Out-of-bounds signal for minimum read address.
+    - `sample_count_cfg_writer_oob`: Out-of-bounds signal for maximum write count.
+    - `sample_count_cfg_reader_oob`: Out-of-bounds signal for maximum read count.
     - `sys_en_oob`: Out-of-bounds signal for system enable.
     - `lock_viol`: Signal indicating a lock violation.
     - `s_axi_awready`: AXI4-Lite write address ready.
@@ -42,7 +50,7 @@ The `axi_shim_cfg` module provides a configurable interface for managing system 
     - `s_axi_rvalid`: AXI4-Lite read data valid.
 
 - **Operation**:
-  - On reset (`aresetn` low), all internal and output configuration values are initialized to their parameterized default values.
+  - On reset (`aresetn` low), all internal and output configuration values are initialized to their parameterized default values, capped to their valid ranges.
   - Output configuration values are updated to the AXI-written internal variables and locked when the `sys_en` bit is set high by the AXI interface. Once locked, any attempt to modify the values results in a lock violation, indicated by latching high the `lock_viol` signal.
   - Each internal configuration value is checked against a parameterized range defined in local parameters. If a value is outside its valid range, a corresponding "out-of-bounds" signal is asserted.
   - The `unlock` signal can be used to clear the lock and allow modifications to the configuration registers if `sys_en` has been set low.
