@@ -154,7 +154,7 @@ proc module {module_name module_body {module_conn {}}} {
   }
 }
 
-# Procedure for assigning an address for an already-connected AXI interface pin
+# Procedure for assigning an address for a connected AXI interface pin
 #  offset: offset of the address
 #  range: range of the address
 #  intf_pin: name of the interface pin to assign the address to
@@ -162,6 +162,14 @@ proc addr {offset range intf_pin} {
   set object [get_bd_intf_pins $intf_pin]
   set segment [get_bd_addr_segs -of_objects $object]
   assign_bd_address -offset $offset -range $range $segment
+}
+
+# Procedure for assigning an address for a segment of a connected AXI interface pin
+#  offset: offset of the address
+#  range: range of the address
+#  segment: name of the segment to assign the address to
+proc addr_segment {offset range segment} {
+  assign_bd_address -offset $offset -range $range [get_bd_addr_segs $segment]
 }
 
 # Automate the creation of an AXI interconnect. This creates an intermediary AXI core.

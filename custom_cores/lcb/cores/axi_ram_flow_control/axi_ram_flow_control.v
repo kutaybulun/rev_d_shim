@@ -14,13 +14,25 @@ module axi_ram_flow_control #
   input  wire                        aclk,
   input  wire                        aresetn,
 
+  input  wire                        dma_enable,
+
   // Configuration and status
   input  wire [AXI_ADDR_WIDTH-1:0]   min_addr_writer,
   input  wire [AXI_ADDR_WIDTH-1:0]   min_addr_reader,
-  input  wire [ADDR_WIDTH-1:0]       sample_count_cfg_writer,
-  input  wire [ADDR_WIDTH-1:0]       sample_count_cfg_reader,
-  output wire [ADDR_WIDTH-1:0]       sample_count_sts_writer,
-  output wire [ADDR_WIDTH-1:0]       sample_count_sts_reader,
+  input  wire [ADDR_WIDTH-1:0]       sample_count_writer,
+  input  wire [ADDR_WIDTH-1:0]       sample_count_reader,
+
+  // Start/End pointers
+  input  wire [ADDR_WIDTH-1:0]       writer_start_ptr,
+  output wire [ADDR_WIDTH-1:0]       writer_end_ptr,
+  output wire [ADDR_WIDTH-1:0]       reader_start_ptr,
+  input  wire [ADDR_WIDTH-1:0]       reader_end_ptr,
+
+  // Status signals
+  output wire                        overflow_out,
+  output wire                        underflow_out,
+  output wire                        overflow_in,
+  output wire                        underflow_in,
 
   // AXI Master Write Interface
   output wire [AXI_ID_WIDTH-1:0]     m_axi_awid,
@@ -69,6 +81,27 @@ module axi_ram_flow_control #
   input  wire                        m_axis_tready
 );
 
+  localparam integer FIFO_READ_DEPTH = FIFO_WRITE_DEPTH * AXIS_TDATA_WIDTH / AXI_DATA_WIDTH;
+
+  reg stopped;
+
+  reg writer_enable;
+  reg reader_enable;
+  
+  wire writer_start_loop_parity;
+  wire writer_end_loop_parity;
+  wire reader_start_loop_parity;
+  wire reader_end_loop_parity;
+  reg  prev_writer_start_loop_parity;
+  reg  prev_writer_end_loop_parity;
+  reg  prev_reader_start_loop_parity;
+  reg  prev_reader_end_loop_parity;
+
+  reg [ADDR_WIDTH-1:0] prev_writer_start_ptr;
+  reg [ADDR_WIDTH-1:0] prev_writer_end_ptr;
+  reg [ADDR_WIDTH-1:0] prev_reader_start_ptr;
+  reg [ADDR_WIDTH-1:0] prev_reader_end_ptr;
+
   // Instantiate the AXI RAM Writer
   axis_ram_writer #(
     .ADDR_WIDTH(ADDR_WIDTH),
@@ -81,8 +114,8 @@ module axi_ram_flow_control #
     .aclk(aclk),
     .aresetn(aresetn),
     .min_addr(min_addr_writer),
-    .sample_count_cfg(sample_count_cfg_writer),
-    .sample_count_sts(sample_count_sts_writer),
+    .cfg_data(sample_count_writer),
+    .sts_data(writer_end_ptr),
     .m_axi_awid(m_axi_awid),
     .m_axi_awlen(m_axi_awlen),
     .m_axi_awsize(m_axi_awsize),
@@ -111,13 +144,13 @@ module axi_ram_flow_control #
     .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
     .AXI_DATA_WIDTH(AXI_DATA_WIDTH),
     .AXIS_TDATA_WIDTH(AXIS_TDATA_WIDTH),
-    .FIFO_WRITE_DEPTH(FIFO_WRITE_DEPTH)
+    .FIFO_WRITE_DEPTH(FIFO_READ_DEPTH)
   ) reader_inst (
     .aclk(aclk),
     .aresetn(aresetn),
     .min_addr(min_addr_reader),
-    .sample_count_cfg(sample_count_cfg_reader),
-    .sample_count_sts(sample_count_sts_reader),
+    .cfg_data(sample_count_reader),
+    .sts_data(reader_start_ptr),
     .m_axi_arid(m_axi_arid),
     .m_axi_arlen(m_axi_arlen),
     .m_axi_arsize(m_axi_arsize),
@@ -136,4 +169,73 @@ module axi_ram_flow_control #
     .m_axis_tready(m_axis_tready)
   );
 
+  // Loop detection logic
+  assign writer_start_loop_parity = (writer_start_ptr < prev_writer_start_ptr) ? ~prev_writer_start_loop_parity : prev_writer_start_loop_parity;
+  assign writer_end_loop_parity = (writer_end_ptr < prev_writer_end_ptr) ? ~prev_writer_end_loop_parity : prev_writer_end_loop_parity;
+  assign reader_start_loop_parity = (reader_start_ptr < prev_reader_start_ptr) ? ~prev_reader_start_loop_parity : prev_reader_start_loop_parity;
+  assign reader_end_loop_parity = (reader_end_ptr < prev_reader_end_ptr) ? ~prev_reader_end_loop_parity : prev_reader_end_loop_parity;
+
+  // Control logic for flow control
+  always @(posedge aclk or negedge aresetn) begin
+    if (!aresetn) begin
+      prev_writer_start_loop_parity <= 1'b0;
+      prev_writer_end_loop_parity <= 1'b0;
+      prev_reader_start_loop_parity <= 1'b0;
+      prev_reader_end_loop_parity <= 1'b0;
+      prev_writer_start_ptr <= 0;
+      prev_writer_end_ptr <= 0;
+      prev_reader_start_ptr <= 0;
+      prev_reader_end_ptr <= 0;
+      writer_enable <= 1'b0;
+      reader_enable <= 1'b0;
+      stopped <= 1'b0;
+      overflow_out <= 1'b0;
+      underflow_out <= 1'b0;
+      overflow_in <= 1'b0;
+      underflow_in <= 1'b0;
+    end else if (dma_enable & ~stopped) begin
+      // Update previous pointers
+      prev_writer_start_loop_parity <= writer_start_loop_parity;
+      prev_writer_end_loop_parity <= writer_end_loop_parity;
+      prev_reader_start_loop_parity <= reader_start_loop_parity;
+      prev_reader_end_loop_parity <= reader_end_loop_parity;
+      prev_writer_start_ptr <= writer_start_ptr;
+      prev_writer_end_ptr <= writer_end_ptr;
+      prev_reader_start_ptr <= reader_start_ptr;
+      prev_reader_end_ptr <= reader_end_ptr;
+
+      // Check for wrap-around violation
+      if (writer_start_loop_parity == writer_end_loop_parity) begin
+        if (writer_start_ptr > writer_end_ptr) begin
+          underflow_out <= 1'b1;
+          stopped <= 1'b1;
+        end
+      end else begin
+        if (writer_start_ptr < writer_end_ptr) begin
+          overflow_out <= 1'b1;
+          stopped <= 1'b1;
+        end
+      end
+      if (reader_start_loop_parity == reader_end_loop_parity) begin
+        if (reader_start_ptr > reader_end_ptr) begin
+          underflow_in <= 1'b1;
+          stopped <= 1'b1;
+        end
+      end else begin
+        if (reader_start_ptr < reader_end_ptr) begin
+          overflow_in <= 1'b1;
+          stopped <= 1'b1;
+        end
+      end
+
+      // Enable writer if there's space (track loop parity to account for wrap-around)
+      writer_enable <= (writer_start_loop_parity == writer_end_loop_parity) ? 1'b1
+                    : (writer_start_ptr > writer_end_ptr) ? 1'b1
+                    : 1'b0;
+      // Enable reader if there's space
+      reader_enable <= (reader_start_loop_parity != reader_end_loop_parity) ? 1'b1
+                    : (reader_start_ptr < reader_end_ptr) ? 1'b1
+                    : 1'b0;
+    end
+  end
 endmodule
