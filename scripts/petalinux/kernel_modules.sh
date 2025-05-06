@@ -35,11 +35,22 @@ source ${PETALINUX_PATH}/settings.sh
 cd tmp/${BRD}/${VER}/${PRJ}/petalinux
 
 # Add kernel modules to the project
-# TODO: Not actually adding kernel modules yet, just doing a dummy step
 echo "[PTLNX KMOD SCRIPT] Adding kernel modules to PetaLinux project"
 while IFS= read -r MOD; do
   echo "[PTLNX KMOD SCRIPT] Adding kernel module: ${MOD}"
   petalinux-create modules --name ${MOD} --enable --force
+
+  # Copy the source files into the kernel module directory
+  SRC_DIR="../../../../../kernel_modules/${MOD}/petalinux/${PETALINUX_VERSION}"
+  KMOD_DIR="project-spec/meta-user/recipes-modules/${MOD}/files"
+
+  # Copy the makefile and top source file, overwriting the default ones
+  cp -f "${SRC_DIR}/Makefile" "${KMOD_DIR}/Makefile"
+  cp -f "${SRC_DIR}/${MOD}.c" "${KMOD_DIR}/${MOD}.c"
+
+  # Copy any additional source files, excluding those two
+  find "${SRC_DIR}" -type f ! -name "Makefile" ! -name "${MOD}.c" -exec cp -f {} "${KMOD_DIR}/" \;
+
 done < ../../../../../${KERNEL_MODULES_FILE}
 
 
