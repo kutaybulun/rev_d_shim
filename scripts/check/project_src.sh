@@ -36,25 +36,28 @@ fi
 
 BD_FILE=projects/${PRJ}/block_design.tcl
 
-# Use get_cores_from_tcl.sh to extract core paths
+# Use get_cores_from_tcl.sh to extract custom core paths
 CORE_NAMES=$(./scripts/make/get_cores_from_tcl.sh "${BD_FILE}")
 if [ $? -ne 0 ]; then
   echo "[CHECK PROJECT SRC] ERROR: Failed to extract cores from block design file."
   exit 1
 fi
 
+# If no custom cores, exit
+[ -z "$CORE_NAMES" ] && exit 0
+
 # Verify that each extracted core path exists
 while IFS= read -r CORE_NAME; do
   # Convert a core name (like lcb/hw_manager) to a core path (like custom_cores/lcb/cores/hw_manager)
   CORE_PATH="custom_cores/${CORE_NAME//\//\/cores/}"
   if [ ! -d "$CORE_PATH" ]; then
-    echo "[CHECK CORES] ERROR: Core path does not exist: $CORE_PATH"
+    echo "[CHECK PROJECT SRC] ERROR: Core path does not exist: $CORE_PATH"
     exit 1
   fi
   # Check if the core path contains a .v or .sv file of the same name
   CORE_FILE="${CORE_PATH}/$(basename "$CORE_NAME").v"
   if [ ! -f "$CORE_FILE" ]; then
-    echo "[CHECK CORES] ERROR: Core top file does not exist: $CORE_FILE"
+    echo "[CHECK PROJECT SRC] ERROR: Core top file does not exist: $CORE_FILE"
     exit 1
   fi
 done <<< "$CORE_NAMES"
