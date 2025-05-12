@@ -70,6 +70,7 @@ else
   --format BIN \
   --fsbl \
   --fpga \
+  --kernel \
   --boot-device sd \
   --force
 fi
