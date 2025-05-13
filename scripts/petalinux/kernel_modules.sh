@@ -21,7 +21,7 @@ set -e
 ./scripts/check/kmod_src.sh ${BRD} ${VER} ${PRJ}
 
 # Check for a kernel_modules file
-KERNEL_MODULES_FILE="projects/${PRJ}/cfg/${BRD}/${VER}/petalinux/${PETALINUX_VERSION}/kernel_modules"
+KERNEL_MODULES_FILE="projects/${PRJ}/cfg/${BRD}/${VER}/petalinux/kernel_modules"
 if [ ! -f "${KERNEL_MODULES_FILE}" ]; then
   echo "[PTLNX KMODS] INFO: No kernel_modules file found. Skipping kernel module checks."
   echo "  Path: ${KERNEL_MODULES_FILE}"

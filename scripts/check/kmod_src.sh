@@ -36,7 +36,7 @@ else
 fi
 
 # Check for the kernel_modules file
-KERNEL_MODULES_FILE="projects/${PRJ}/cfg/${BRD}/${VER}/petalinux/${PETALINUX_VERSION}/kernel_modules"
+KERNEL_MODULES_FILE="projects/${PRJ}/cfg/${BRD}/${VER}/petalinux/kernel_modules"
 if [ -f "${KERNEL_MODULES_FILE}" ]; then
   while IFS= read -r module || [ -n "$module" ]; do
     # Ensure each line is a single word
