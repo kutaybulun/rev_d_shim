@@ -14,7 +14,7 @@ module axi_shim_cfg #
   parameter integer INTEGRATOR_WINDOW_DEFAULT = 5000000, // 100 ms at 50MHz
 
   // Integrator enable (+12)
-  parameter integer INTEG_EN_DEFAULT = 1,
+  parameter integer INTEG_EN_DEFAULT = 1
 )
 (
   // System signals
