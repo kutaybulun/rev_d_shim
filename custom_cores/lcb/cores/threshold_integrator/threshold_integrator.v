@@ -52,6 +52,10 @@ module threshold_integrator (
   reg signed [17:0] sum_delta   [ 7:0];
   reg signed [48:0] total_sum   [ 7:0];
 
+  // Registers for shift-add multiplication
+  reg [47:0] window_reg;
+  reg [14:0] threshold_average_shift;
+  reg [ 4:0] max_value_mult_cnt;
 
   //// State encoding
   localparam  IDLE          = 3'd0,
@@ -60,7 +64,6 @@ module threshold_integrator (
               RUNNING       = 3'd3,
               OUT_OF_BOUNDS = 3'd4,
               ERROR         = 3'd5;
-
 
   //// FIFO for rolling integration memory
   fifo_sync #(
@@ -78,7 +81,6 @@ module threshold_integrator (
     .empty(fifo_empty)
   );
 
-
   //// FIFO I/O
   always @* begin
     if (fifo_in_queue_count != 0) begin
@@ -89,7 +91,6 @@ module threshold_integrator (
   end
   assign wr_en = (fifo_in_queue_count != 0);
   assign rd_en = (fifo_out_queue_count != 0);
-
 
   //// Global logic
   always @(posedge clk) begin : global_logic
@@ -115,6 +116,11 @@ module threshold_integrator (
       err_overflow <= 0;
       err_underflow <= 0;
       setup_done <= 0;
+
+      // Shift-add multiplication registers
+      window_reg <= 0;
+      threshold_average_shift <= 0;
+      max_value_mult_cnt <= 0;
 
       // Set initial state
       state <= IDLE;
@@ -172,18 +178,29 @@ module threshold_integrator (
               state <= OUT_OF_BOUNDS;
             end
 
-            // Calculate min/max values
-            max_value <= threshold_average * window;
+            // Prepare for shift-add multiplication in SETUP
+            window_reg <= window;
+            threshold_average_shift <= threshold_average;
+            max_value_mult_cnt <= 0;
 
             state <= SETUP;
           end
         end // IDLE
 
-        // SETUP state, intermediate calculations
+        // SETUP state, calculating max_value and sample size
         SETUP: begin
-          sub_average_size <= (chunk_size > 20) ? (chunk_size - 20) : 0;
-          sample_size <= (chunk_size > 20) ? 20 : chunk_size;
-          state <= WAIT;
+          // Shift-add multiplication for max_value = threshold_average * window
+          if (|threshold_average_shift) begin
+            if (threshold_average_shift[0]) begin
+              max_value <= max_value + (window_reg << max_value_mult_cnt);
+            end
+            threshold_average_shift <= threshold_average_shift >> 1;
+            max_value_mult_cnt <= max_value_mult_cnt + 1;
+          end else begin // Finished shift-add multiplication, calculate sample size and go to WAIT for sample core
+            sub_average_size <= (chunk_size > 20) ? (chunk_size - 20) : 0;
+            sample_size <= (chunk_size > 20) ? 20 : chunk_size;
+            state <= WAIT;
+          end
         end // SETUP
 
         // WAIT state, waiting for sample core (DAC/ADC) to finish setting up
@@ -270,7 +287,6 @@ module threshold_integrator (
       endcase // state
     end
   end // Global logic
-
 
   //// Per-channel logic
   genvar i;
