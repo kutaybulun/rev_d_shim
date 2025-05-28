@@ -1,3 +1,4 @@
+// Partial credit to H. Fatih Uǧurdaǧ
 module fifo_sync #(
     parameter DATA_WIDTH = 16,
     parameter ADDR_WIDTH = 4,  // FIFO depth = 2^ADDR_WIDTH
@@ -5,7 +6,7 @@ module fifo_sync #(
     parameter ALMOST_EMPTY_THRESHOLD = 2 // Adjust as needed
 )(
     input  wire                   clk,
-    input  wire                   resetn, // HFU
+    input  wire                   resetn,
     input  wire [DATA_WIDTH-1:0]  wr_data,
     input  wire                   wr_en,
     output wire                   full,
@@ -20,13 +21,13 @@ module fifo_sync #(
     // Write and read pointers
     reg [ADDR_WIDTH:0] wr_ptr_bin;
     reg [ADDR_WIDTH:0] rd_ptr_bin;
-    reg [ADDR_WIDTH:0] rd_ptr_bin_nxt; // HFU
+    reg [ADDR_WIDTH:0] rd_ptr_bin_nxt;
 
     // Write logic
     always @(posedge clk) begin
-        if (~resetn) begin // HFU
+        if (~resetn) begin
             wr_ptr_bin <= 0;
-        end else if (wr_en) begin // HFU
+        end else if (wr_en) begin
             wr_ptr_bin <= wr_ptr_bin + 1;
         end
     end
