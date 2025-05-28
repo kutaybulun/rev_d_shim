@@ -31,7 +31,6 @@ module threshold_integrator (
   wire       fifo_full               ;
   wire       wr_en                   ;
   reg [ 3:0] fifo_out_queue_count    ;
-  reg [ 3:0] fifo_out_idx            ;
   wire[35:0] fifo_dout               ;
   wire       fifo_empty              ;
   wire       rd_en                   ;
@@ -67,7 +66,7 @@ module threshold_integrator (
   )
   rolling_sum_mem (
     .clk(clk),
-    .aresetn(aresetn),
+    .resetn(aresetn),
     .wr_data(fifo_din),
     .wr_en(wr_en),
     .full(fifo_full),
@@ -99,7 +98,6 @@ module threshold_integrator (
       outflow_timer <= 0;
       fifo_in_queue_count <= 0;
       fifo_out_queue_count <= 0;
-      fifo_out_idx <= 0;
 
       // Zero all output signals
       over_threshold <= 0;
@@ -244,8 +242,7 @@ module threshold_integrator (
             outflow_timer <= sample_mask << 4;
           end // Outflow timer
 
-          // Outflow FIFO counters (index 1-delayed from fifo_out_queue_count to allow for 1-cycle read delay)
-          fifo_out_idx <= fifo_out_queue_count;
+          // Outflow FIFO counter
           if (fifo_out_queue_count != 0) begin
             // FIFO pop is done in the per-channel logic below
             fifo_out_queue_count <= fifo_out_queue_count - 1;
@@ -305,7 +302,7 @@ module threshold_integrator (
 
           //// Outflow logic
           // Outflow FIFO logic
-          if (fifo_out_idx == i + 1) begin
+          if (fifo_out_queue_count == i + 1) begin
             queued_fifo_out_sample_sum[i] <= fifo_dout;
           end // Outflow FIFO logic
 
