@@ -31,10 +31,10 @@ module fifo_sync #(
     bram(
       .clk(clk),
       .wr_addr(wr_ptr_bin[ADDR_WIDTH-1:0]), 
-      .wr_data(wr_data)
+      .wr_data(wr_data),
       .wr_en(wr_en), 
       .rd_addr(rd_ptr_bin_nxt[ADDR_WIDTH-1:0]),
-      .rd_data(rd_data),
+      .rd_data(rd_data)
     );
 
     // Write logic

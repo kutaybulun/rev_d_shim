@@ -2,49 +2,46 @@
 
 module threshold_integrator (
   // Inputs
-  input   wire         clk                ,
-  input   wire         aresetn            ,
-  input   wire         enable             ,
-  input   wire [ 31:0] window             ,
-  input   wire [ 14:0] threshold_average  ,
-  input   wire         sample_core_done   ,
-  input   wire [119:0] abs_value_in_concat,
-  input   wire [  7:0] value_ready_concat ,
+  input   wire         clk              ,
+  input   wire         resetn           ,
+  input   wire         enable           ,
+  input   wire [ 31:0] window           ,
+  input   wire [ 14:0] threshold_average,
+  input   wire         sample_core_done ,
+  input   wire [119:0] abs_sample_concat,
 
   // Outputs
-  output  reg         err_overflow  ,
-  output  reg         err_underflow ,
-  output  reg         over_threshold,
+  output  reg         err_overflow ,
+  output  reg         err_underflow,
+  output  reg         over_thresh  ,
   output  reg         setup_done
 );
 
   //// Internal signals
-  wire[14:0] value_in   [7:0];
-  wire       value_ready[7:0];
-  reg [43:0] max_value               ;
-  reg [ 4:0] sample_size             ;
-  reg [24:0] sample_mask             ;
-  reg [24:0] inflow_sample_timer     ;
-  reg [31:0] outflow_timer           ;
-  reg [ 3:0] fifo_in_queue_count     ;
-  reg [35:0] fifo_din                ;
-  wire       fifo_full               ;
-  wire       wr_en                   ;
-  reg [ 3:0] fifo_out_queue_count    ;
-  wire[35:0] fifo_dout               ;
-  wire       fifo_empty              ;
-  wire       rd_en                   ;
-  wire[ 7:0] channel_over_threshold  ;
-  reg [ 2:0] state                   ;
-  reg [14:0] inflow_value               [ 7:0];
-  reg [35:0] inflow_sample_sum          [ 7:0];
-  reg [35:0] queued_fifo_in_sample_sum  [ 7:0];
-  reg [35:0] queued_fifo_out_sample_sum [ 7:0];
-  reg [14:0] outflow_value              [ 7:0];
-  reg [15:0] outflow_value_plus_one     [ 7:0];
-  reg [19:0] outflow_remainder          [ 7:0];
-  reg signed [16:0] sum_delta   [ 7:0];
-  reg signed [44:0] total_sum   [ 7:0];
+  reg [43:0] max_value           ;
+  reg [ 4:0] sample_size         ;
+  reg [24:0] sample_mask         ;
+  reg [24:0] inflow_sample_timer ;
+  reg [31:0] outflow_timer       ;
+  reg [ 3:0] fifo_in_queue_count ;
+  reg [35:0] fifo_din            ;
+  wire       fifo_full           ;
+  wire       wr_en               ;
+  reg [ 3:0] fifo_out_queue_count;
+  wire[35:0] fifo_dout           ;
+  wire       fifo_empty          ;
+  wire       rd_en               ;
+  wire[ 7:0] channel_over_thresh ;
+  reg [ 2:0] state               ;
+  wire[14:0] inflow_value               [0:7];
+  reg [35:0] inflow_sample_sum          [0:7];
+  reg [35:0] queued_fifo_in_sample_sum  [0:7];
+  reg [35:0] queued_fifo_out_sample_sum [0:7];
+  reg [14:0] outflow_value              [0:7];
+  reg [15:0] outflow_value_plus_one     [0:7];
+  reg [19:0] outflow_remainder          [0:7];
+  reg signed [16:0] sum_delta           [0:7];
+  reg signed [44:0] total_sum           [0:7];
 
   // Registers for shift-add multiplication
   reg [43:0] window_reg;
@@ -66,7 +63,7 @@ module threshold_integrator (
   )
   rolling_sum_mem (
     .clk(clk),
-    .resetn(aresetn),
+    .resetn(resetn),
     .wr_data(fifo_din),
     .wr_en(wr_en),
     .full(fifo_full),
@@ -89,7 +86,7 @@ module threshold_integrator (
   //// Global logic
   always @(posedge clk) begin : global_logic
     // Reset logic
-    if (~aresetn) begin : reset_logic
+    if (~resetn) begin : reset_logic
       // Zero all individual signals
       max_value <= 0;
       sample_size <= 0;
@@ -100,7 +97,7 @@ module threshold_integrator (
       fifo_out_queue_count <= 0;
 
       // Zero all output signals
-      over_threshold <= 0;
+      over_thresh <= 0;
       err_overflow <= 0;
       err_underflow <= 0;
       setup_done <= 0;
@@ -162,7 +159,7 @@ module threshold_integrator (
             end else if (window[11]) begin
               sample_size <= 1;
             end else begin // Disallowed size of window
-              over_threshold <= 1;
+              over_thresh <= 1;
               state <= OUT_OF_BOUNDS;
             end
 
@@ -215,8 +212,8 @@ module threshold_integrator (
           end
           
           // Over threshold logic
-          if (|channel_over_threshold) begin
-            over_threshold <= 1;
+          if (|channel_over_thresh) begin
+            over_thresh <= 1;
             state <= OUT_OF_BOUNDS;
           end
 
@@ -266,14 +263,12 @@ module threshold_integrator (
   genvar i;
   generate // Per-channel logic generate
     for (i = 0; i < 8; i = i + 1) begin : channel_loop
-      assign value_in[i] = abs_value_in_concat[15 * (i + 1) - 1 -: 15];
-      assign value_ready[i] = value_ready_concat[i];
-      assign channel_over_threshold[i] = (total_sum[i] > max_value) ? 1 : 0;
+      assign channel_over_thresh[i] = (total_sum[i] > max_value) ? 1 : 0;
+      assign inflow_value[i] = abs_sample_concat[((i+1)*15)-1 -: 15];
 
       always @(posedge clk) begin : channel_logic
-        if (~aresetn) begin : channel_reset
+        if (~resetn) begin : channel_reset
           // Zero all per-channel signals
-          inflow_value[i] = 0;
           inflow_sample_sum[i] = 0;
           queued_fifo_in_sample_sum[i] = 0;
           queued_fifo_out_sample_sum[i] = 0;
@@ -287,10 +282,6 @@ module threshold_integrator (
           //// Inflow logic
           // Only sample every 16th clock cycle
           if (~|inflow_sample_timer) begin
-            // Move new values external values in when valid
-            if (value_ready[i]) begin
-              inflow_value[i] <= value_in[i];
-            end
             // Inflow addition logic
             if (inflow_sample_timer != 0) begin // Add to sample sum
               inflow_sample_sum[i] <= inflow_sample_sum[i] + inflow_value[i];

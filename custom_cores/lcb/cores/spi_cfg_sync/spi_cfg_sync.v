@@ -3,7 +3,7 @@
 
 module spi_cfg_sync (
   input  wire        spi_clk,             // SPI clock
-  input  wire        spi_resetn,          // Active low reset
+  input  wire        sync_resetn,         // Active low reset
 
   // Inputs from axi_shim_cfg (AXI domain)
   input  wire [31:0] trig_lockout,
@@ -41,7 +41,7 @@ module spi_cfg_sync (
     .STABLE_COUNT(2)
   ) sync_trig_lockout (
     .clk(spi_clk),
-    .aresetn(spi_resetn),
+    .resetn(spi_resetn),
     .din(trig_lockout),
     .dout(trig_lockout_sync),
     .stable(trig_lockout_stable_flag)
@@ -53,7 +53,7 @@ module spi_cfg_sync (
     .STABLE_COUNT(2)
   ) sync_integ_thresh_avg (
     .clk(spi_clk),
-    .aresetn(spi_resetn),
+    .resetn(spi_resetn),
     .din(integ_thresh_avg),
     .dout(integ_thresh_avg_sync),
     .stable(integ_thresh_avg_stable_flag)
@@ -65,7 +65,7 @@ module spi_cfg_sync (
     .STABLE_COUNT(2)
   ) sync_integ_window (
     .clk(spi_clk),
-    .aresetn(spi_resetn),
+    .resetn(spi_resetn),
     .din(integ_window),
     .dout(integ_window_sync),
     .stable(integ_window_stable_flag)
@@ -77,7 +77,7 @@ module spi_cfg_sync (
     .STABLE_COUNT(2)
   ) sync_integ_en (
     .clk(spi_clk),
-    .aresetn(spi_resetn),
+    .resetn(spi_resetn),
     .din(integ_en),
     .dout(integ_en_sync),
     .stable(integ_en_stable_flag)
@@ -89,7 +89,7 @@ module spi_cfg_sync (
     .STABLE_COUNT(2)
   ) sync_spi_en (
     .clk(spi_clk),
-    .aresetn(spi_resetn),
+    .resetn(spi_resetn),
     .din(spi_en),
     .dout(spi_en_sync),
     .stable(spi_en_stable_flag)
@@ -97,7 +97,7 @@ module spi_cfg_sync (
 
   // Update stable registers when all signals are stable and spi_en_sync is high
   always @(posedge spi_clk) begin
-    if (~spi_resetn) begin
+    if (~sync_resetn) begin
       trig_lockout_stable      <= 32'b0;
       integ_thresh_avg_stable  <= 15'b0;
       integ_window_stable      <= 32'b0;
