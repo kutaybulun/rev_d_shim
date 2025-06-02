@@ -165,7 +165,7 @@ module axi_shim_cfg #
   assign int_initial_data_wire[INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET*32+INTEGRATOR_THRESHOLD_AVERAGE_WIDTH-1-:INTEGRATOR_THRESHOLD_AVERAGE_WIDTH] = INTEGRATOR_THRESHOLD_AVERAGE_DEFAULT_CAPPED;
   assign int_initial_data_wire[INTEGRATOR_WINDOW_32_OFFSET*32+INTEGRATOR_WINDOW_WIDTH-1-:INTEGRATOR_WINDOW_WIDTH] = INTEGRATOR_WINDOW_DEFAULT_CAPPED;
   assign int_initial_data_wire[INTEGRATOR_EN_32_OFFSET*32] = INTEG_EN_DEFAULT;
-  assign int_initial_data_wire[BUFFER_RESET_32_OFFSET*32+BUFFER_RESET_WIDTH-1-:BUFFER_RESET_WIDTH] = 0;
+  assign int_initial_data_wire[BUFFER_RESET_32_OFFSET*32+BUFFER_RESET_WIDTH-1-:BUFFER_RESET_WIDTH] = {BUFFER_RESET_WIDTH{1'b0}}; // Buffer reset defaults to 0 (but ~aresetn will override them to 1)
   assign int_initial_data_wire[SYS_EN_32_OFFSET*32] = 0;
 
   // Out of bounds checks. Use the whole word for the check to avoid truncation
@@ -213,7 +213,7 @@ module axi_shim_cfg #
       integ_thresh_avg <= INTEGRATOR_THRESHOLD_AVERAGE_DEFAULT_CAPPED;
       integ_window <= INTEGRATOR_WINDOW_DEFAULT_CAPPED;
       integ_en <= INTEG_EN_DEFAULT;
-      buffer_reset <= 0;
+      buffer_reset <= {BUFFER_RESET_WIDTH{1'b1}}; // Buffer reset is high if reset is asserted, but defaults to 0 otherwise
 
       locked <= 1'b0;
       lock_viol <= 1'b0;
@@ -235,7 +235,6 @@ module axi_shim_cfg #
         locked <= 1'b0;
         lock_viol <= 1'b0;
       end
-
 
       // Check for lock violations if locked
       if(locked) begin

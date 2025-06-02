@@ -249,11 +249,17 @@ tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)/bitstream.bit: tmp/$(BOARD)/$(BOARD_VER)/$(
 # The hardware definition file
 # Requires the project file
 # Built using the scripts/vivado/hw_def.tcl script
+# This target uses a `-` before the first VIVADO command to ignore errors,
+#   then tracks if there was actually an error. This allows the second script to run,
+#   logging the utilization, but still exit with an error at the end if the first command failed.
+#   Note the `;` and `\` that make these steps a single command line, as make runs each line separately.
 tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)/hw_def.xsa: tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)/project.xpr
 	@./scripts/make/status.sh "MAKING HW DEF: $(BOARD)/$(BOARD_VER)/$(PROJECT)/hw_def.xsa"
-	$(VIVADO) -source scripts/vivado/hw_def.tcl -tclargs $(BOARD)/$(BOARD_VER)/$(PROJECT)
-	@./scripts/make/status.sh "WRITING UTILIZATION: $(BOARD)/$(BOARD_VER)/$(PROJECT)/hw_def.xsa"
-	$(VIVADO) -source scripts/vivado/utilization.tcl -tclargs $(BOARD)/$(BOARD_VER)/$(PROJECT)
+	-$(VIVADO) -source scripts/vivado/hw_def.tcl -tclargs $(BOARD)/$(BOARD_VER)/$(PROJECT); \
+		RESULT=$$?; \
+		./scripts/make/status.sh "WRITING UTILIZATION: $(BOARD)/$(BOARD_VER)/$(PROJECT)/hw_def.xsa"; \
+		$(VIVADO) -source scripts/vivado/utilization.tcl -tclargs $(BOARD)/$(BOARD_VER)/$(PROJECT); \
+		if [ $$RESULT -ne 0 ]; then exit $$RESULT; fi
 
 # The PetaLinux project
 # Requires the hardware definition file

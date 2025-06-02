@@ -1,3 +1,4 @@
+// Thanks to Thomas Witzel, H. Fatih Uǧurdaǧ, and Kutay Bulun :)
 module fifo_asynch_count #(
     parameter DATA_WIDTH = 16,
     parameter ADDR_WIDTH = 4,  // FIFO depth = 2^ADDR_WIDTH
@@ -37,15 +38,30 @@ module fifo_asynch_count #(
         end
     endfunction
 
-    // FIFO memory
-    (* ram_style = "block" *) reg [DATA_WIDTH-1:0] mem [0:(1<<ADDR_WIDTH)-1];
-
     // Write and read pointers
     reg [ADDR_WIDTH:0] wr_ptr_bin;
     reg [ADDR_WIDTH:0] wr_ptr_gray; // the gray code version of the pointer is used for synchronization
 
     reg [ADDR_WIDTH:0] rd_ptr_bin;
+    reg [ADDR_WIDTH:0] rd_ptr_bin_next;
     reg [ADDR_WIDTH:0] rd_ptr_gray; // the gray code version of the pointer is used for synchronization
+
+    // FIFO memory (BRAM instance)
+    bram_async #(
+        .DATA_WIDTH(DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH)
+    )
+    bram (
+        .wr_clk(wr_clk),
+        .wr_addr(wr_ptr_bin[ADDR_WIDTH-1:0]),
+        .wr_data(wr_data),
+        .wr_en(wr_en),
+
+        .rd_clk(rd_clk),
+        .rd_addr(rd_ptr_bin_next[ADDR_WIDTH-1:0]),
+        .rd_data(rd_data)
+    );
+        
 
     // Write logic
     always @(posedge wr_clk or negedge wr_rst_n) begin
@@ -53,24 +69,22 @@ module fifo_asynch_count #(
             wr_ptr_bin <= 0;
             wr_ptr_gray <= 0;
         end else if (wr_en && ~full) begin
-            mem[wr_ptr_bin[ADDR_WIDTH-1:0]] <= wr_data;
             wr_ptr_bin <= wr_ptr_bin + 1;
             wr_ptr_gray <= binary_to_gray(wr_ptr_bin + 1);
         end
     end
 
     // Read logic
+    always @* rd_ptr_bin_next = rd_ptr_bin + (rd_en & ~empty);
     always @(posedge rd_clk or negedge rd_rst_n) begin
         if (~rd_rst_n) begin
             rd_ptr_bin <= 0;
             rd_ptr_gray <= 0;
-        end else if (rd_en && ~empty) begin
-            rd_ptr_bin <= rd_ptr_bin + 1;
-            rd_ptr_gray <= binary_to_gray(rd_ptr_bin + 1);
+        end else begin
+            rd_ptr_bin <= rd_ptr_bin_next;
+            rd_ptr_gray <= binary_to_gray(rd_ptr_bin_next);
         end
     end
-
-    assign rd_data = mem[rd_ptr_bin[ADDR_WIDTH-1:0]];
 
     // Synchronize pointers across clock domains
     // Use double-flop synchronizers for wr_ptr in read clock domain
@@ -120,5 +134,32 @@ module fifo_asynch_count #(
     assign fifo_count_rd_clk = wr_ptr_bin_rd_clk - rd_ptr_bin;
 
     assign almost_empty = (fifo_count_rd_clk <= ALMOST_EMPTY_THRESHOLD);
+
+endmodule
+
+// BRAM module formatted and specced to guarantee BRAM utilization in synthesis
+module bram_async #(
+    parameter DATA_WIDTH = 16,
+    parameter ADDR_WIDTH = 4
+)(
+    input  wire                   wr_clk,
+    input  wire [ADDR_WIDTH-1:0]  wr_addr,
+    input  wire [DATA_WIDTH-1:0]  wr_data,
+    input  wire                   wr_en,
+
+    input  wire                   rd_clk,
+    input  wire [ADDR_WIDTH-1:0]  rd_addr,
+    output reg  [DATA_WIDTH-1:0]  rd_data
+);
+
+    (* ram_style = "block" *) reg [DATA_WIDTH-1:0] mem [0:(1<<ADDR_WIDTH)-1];
+
+    always @(posedge wr_clk) begin
+        if(wr_en) mem[wr_addr] <= wr_data;
+    end
+
+    always @(posedge rd_clk) begin
+        rd_data <= mem[rd_addr];
+    end
 
 endmodule
