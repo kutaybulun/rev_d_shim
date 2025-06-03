@@ -108,7 +108,7 @@ proc auto_connect_axi {offset range intf_pin master} {
   set object [get_bd_intf_pins $intf_pin]
   set config [list Master $master Clk Auto]
   apply_bd_automation -rule xilinx.com:bd_rule:axi4 -config $config $object
-  addr $offset $range $intf_pin
+  addr $offset $range $intf_pin $master
 }
 
 

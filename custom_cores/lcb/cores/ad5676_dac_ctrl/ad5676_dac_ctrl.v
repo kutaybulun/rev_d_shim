@@ -12,6 +12,7 @@ module ad5676_dac_ctrl #(
 
   input  wire        trigger,
   input  wire        ldac_shared,
+  output wire        waiting_for_trigger,
   output reg         cmd_buf_underflow,
   output reg         unexp_trig,
   output reg         bad_cmd,
@@ -95,13 +96,15 @@ module ad5676_dac_ctrl #(
                       (cmd_word[31:30] == CMD_SET_CAL) ? IDLE : // If command is SET_CAL, go to IDLE
                       ERROR; // If command is not recognized, go to ERROR state
   end
+  // Waiting for trigger flag
+  assign waiting_for_trigger = (state == TRIG_WAIT);
   // State transition logic
   always @(posedge clk) begin
     if (~resetn) state <= INIT; // Reset to initial state
     else if (state == INIT) state <= IDLE; // Transition from INIT to IDLE
     else if (cal_oob) state <= ERROR; // Error if calibration value is out of bounds
-    else if (trigger && state != TRIG_WAIT) state <= ERROR; // Error if trigger occurs when not waiting for one
-    else if (state == DAC_WR && ldac_shared) state <= ERROR; // Error if global LDAC is asserted while this DAC is writing
+    else if (trigger && !waiting_for_trigger) state <= ERROR; // Error if trigger occurs when not waiting for one
+    else if (ldac_shared && state == DAC_WR) state <= ERROR; // Error if global LDAC is asserted while this DAC is writing
     else if (read_next_dac_word && cmd_buf_empty) state <= ERROR; // Error if DAC sample is expected but buffer is empty
     else if (cmd_finished) state <= next_cmd_state; // Transition to state of next command if command is finished
     else if (state == DAC_WR && dac_ready) state <= wait_for_trigger ? TRIG_WAIT : DELAY; // If the DAC write is done, go to the proper wait state
@@ -112,6 +115,7 @@ module ad5676_dac_ctrl #(
     if (~resetn || state == ERROR) setup_done <= 1'b0; // Reset setup done on reset or error
     else if (state == INIT) setup_done <= 1'b1; // Set setup done when entering INIT state
   end
+
 
 
 
@@ -249,14 +253,12 @@ module ad5676_dac_ctrl #(
       abs_dac_val[6] <= 15'd0;
       abs_dac_val[7] <= 15'd0;
       dac_load_stage <= 2'b00;
-      dac_val_oob <= 1'b0;
     end else 
       case (dac_load_stage)
         2'b00: begin // Initial stage, waiting for the first DAC value to be loaded
           if (read_next_dac_word && ~cmd_buf_empty) begin
             // Reject DAC value of 0xFFFF
-            if (cmd_word[15:0] == 16'hFFFF || cmd_word[31:16] == 16'hFFFF) dac_val_oob <= 1'b1;
-            else begin
+            if (~(cmd_word[15:0] == 16'hFFFF || cmd_word[31:16] == 16'hFFFF))  begin
               first_dac_val_signed <= offset_to_signed(cmd_word[15:0]); // Load first DAC value from command word
               second_dac_val_signed <= offset_to_signed(cmd_word[31:16]); // Load second DAC value from command word
               dac_load_stage <= 2'b01; // Move to next stage
@@ -271,12 +273,23 @@ module ad5676_dac_ctrl #(
           dac_load_stage <= 2'b10; // Move to final stage
         end
         2'b10: begin // Final conversion stage, converting to offset representation
-          // Make sure the calibrated values are within bounds
-          if (first_dac_val_cal_signed < -32767 || first_dac_val_cal_signed > 32767 ||
-              second_dac_val_cal_signed < -32767 || second_dac_val_cal_signed > 32767) dac_val_oob <= 1'b1;
+          // Logic is handled in the SPI shift register and MOSI assignment
+          // OOB is checked in the dac_val_oob logic
           dac_load_stage <= 2'b00; // Conversion is done
         end
       endcase
+  end
+  // DAC val out of bounds logic
+  always @(posedge clk) begin
+    if (~resetn) dac_val_oob <= 1'b0; // Reset out of bounds flag on reset
+    else begin // Set out of bounds flag if either of the following conditions are met:
+      if (dac_load_stage == 2'b00
+          && read_next_dac_word && ~cmd_buf_empty 
+          && (cmd_word[15:0] == 16'hFFFF || cmd_word[31:16] == 16'hFFFF)) dac_val_oob <= 1'b1; // If incoming DAC value is 0xFFFF
+      else if (dac_load_stage == 2'b10 && 
+               (first_dac_val_cal_signed < -16'sd32767 || first_dac_val_cal_signed > 16'sd32767 ||
+                second_dac_val_cal_signed < -16'sd32767 || second_dac_val_cal_signed > 16'sd32767)) dac_val_oob <= 1'b1; // If calibrated DAC value is out of bounds
+    end
   end
   // DAC SPI bit logic
   always @(posedge clk) begin
