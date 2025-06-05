@@ -10,11 +10,11 @@ async def setup_testbench(dut):
                         SHUTDOWN_FORCE_DELAY=250,
                         SHUTDOWN_RESET_PULSE=25,
                         SHUTDOWN_RESET_DELAY=250,
-                        BUF_LOAD_WAIT=2500,
+                        SPI_INIT_WAIT=2500,
                         SPI_START_WAIT=2500)
     return tb
 
-# Helper function to set up the testbench and got to RUNNING state
+# Helper function to set up the testbench and go to RUNNING state
 async def normal_start_up_with_no_log(dut):
     tb = await setup_testbench(dut)
     tb.dut._log.info("SYSTEM WILL GO TO RUNNING STATE: normal_start_up_with_no_log")
@@ -25,15 +25,11 @@ async def normal_start_up_with_no_log(dut):
     # Enable the system
     dut.sys_en.value = 1
 
-    # Wait for START_DMA state
-    await tb.wait_for_state(5, None, True, tb.SHUTDOWN_FORCE_DELAY + tb.SHUTDOWN_RESET_DELAY + tb.SHUTDOWN_RESET_PULSE + 5)
-    # Simulate DAC buffer loading
-    dut.dac_buf_loaded.value = 1  # Set dac_buf_full to 1
-    await RisingEdge(dut.clk)
-    await RisingEdge(dut.clk)
-
-    # Simulate SPI running
-    dut.spi_running.value = 1
+    # Wait for CONFIRM_SPI_START state
+    await tb.wait_for_state(6, None, True, tb.SHUTDOWN_FORCE_DELAY + tb.SHUTDOWN_RESET_DELAY + tb.SHUTDOWN_RESET_PULSE + 5)
+    
+    # Simulate SPI subsystem being off (initialized)
+    dut.spi_off.value = 0  # SPI is running
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
 
@@ -57,13 +53,10 @@ async def test_configuration_errors(dut):
 
     # Error conditions to test for
     error_conditions = [
-        (dut.trig_lockout_oob, 3, "STATUS_TRIG_LOCKOUT_OOB"),
-        (dut.cal_offset_oob, 4, "STATUS_CAL_OFFSET_OOB"),
-        (dut.dac_divider_oob, 5, "STATUS_DAC_DIVIDER_OOB"),
-        (dut.integ_thresh_avg_oob, 6, "STATUS_INTEG_THRESH_AVG_OOB"),
-        (dut.integ_window_oob, 7, "STATUS_INTEG_WINDOW_OOB"),
-        (dut.integ_en_oob, 8, "STATUS_INTEG_EN_OOB"),
-        (dut.sys_en_oob, 9, "STATUS_SYS_EN_OOB")
+        (dut.integ_thresh_avg_oob, 0x0200, "STATUS_INTEG_THRESH_AVG_OOB"),
+        (dut.integ_window_oob, 0x0201, "STATUS_INTEG_WINDOW_OOB"),
+        (dut.integ_en_oob, 0x0202, "STATUS_INTEG_EN_OOB"),
+        (dut.sys_en_oob, 0x0203, "STATUS_SYS_EN_OOB")
     ]
 
     # Iterate through each error condition
@@ -117,7 +110,7 @@ async def test_normal_startup(dut):
     dut.dac_buf_loaded.value = 1  # Set dac_buf_full to 1
     
     # Wait for START_SPI state
-    await tb.wait_for_state(6, None, False, tb.BUF_LOAD_WAIT + 1000)  # START_SPI = 6
+    await tb.wait_for_state(6, None, False, tb.SPI_INIT_WAIT + 1000)  # START_SPI = 6
     await tb.check_state_and_status(6, 1)  # Check that we are in START_SPI state
     await tb.wait_cycles(100)  # Wait for a few cycles to set spi_running
     dut.spi_running.value = 1  # Set spi_running to 1
@@ -258,12 +251,12 @@ async def test_dac_buffer_fill_timeout(dut):
     await tb.wait_for_state(5, None, True, tb.SHUTDOWN_FORCE_DELAY + tb.SHUTDOWN_RESET_DELAY + tb.SHUTDOWN_RESET_PULSE + 5)
 
     # Simulate DAC buffer timeout
-    tb.dut._log.info(f"BUF LOAD WAIT parameter is {dut.BUF_LOAD_WAIT.value}")
-    tb.dut._log.info(f"Simulating DAC buffer timeout, waiting for {tb.BUF_LOAD_WAIT + 1} cycles")
-    await tb.wait_cycles(tb.BUF_LOAD_WAIT + 1)
+    tb.dut._log.info(f"BUF LOAD WAIT parameter is {dut.SPI_INIT_WAIT.value}")
+    tb.dut._log.info(f"Simulating DAC buffer timeout, waiting for {tb.SPI_INIT_WAIT + 1} cycles")
+    await tb.wait_cycles(tb.SPI_INIT_WAIT + 1)
 
-    if(int(dut.timer.value) > tb.BUF_LOAD_WAIT):
-        tb.dut._log.info(f"timer value is {int(dut.timer.value)}, maximum wait time was {tb.BUF_LOAD_WAIT}")
+    if(int(dut.timer.value) > tb.SPI_INIT_WAIT):
+        tb.dut._log.info(f"timer value is {int(dut.timer.value)}, maximum wait time was {tb.SPI_INIT_WAIT}")
 
     await tb.check_state_and_status(8, 27)  # HALTED = 8, STATUS_DAC_BUF_FILL_TIMEOUT = 27
     assert dut.sys_rst.value == 1, "Expected system reset"

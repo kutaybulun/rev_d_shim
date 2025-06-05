@@ -12,52 +12,53 @@ class hw_manager_base:
     # State encoding dictionary
     STATES = {
         1: "IDLE",
-        2: "RELEASE_SD_F",
-        3: "PULSE_SD_RST",
-        4: "SD_RST_DELAY",
-        5: "START_DMA",
-        6: "START_SPI",
+        2: "CONFIRM_SPI_INIT",
+        3: "RELEASE_SD_F",
+        4: "PULSE_SD_RST",
+        5: "SD_RST_DELAY",
+        6: "CONFIRM_SPI_START",
         7: "RUNNING",
         8: "HALTED"
     }
     
     # Status codes dictionary
     STATUS_CODES = {
-        1: "STATUS_OK",
-        2: "STATUS_PS_SHUTDOWN",
-        3: "STATUS_TRIG_LOCKOUT_OOB",
-        4: "STATUS_CAL_OFFSET_OOB",
-        5: "STATUS_DAC_DIVIDER_OOB",
-        6: "STATUS_INTEG_THRESH_AVG_OOB",
-        7: "STATUS_INTEG_WINDOW_OOB",
-        8: "STATUS_INTEG_EN_OOB",
-        9: "STATUS_SYS_EN_OOB",
-        10: "STATUS_LOCK_VIOL",
-        11: "STATUS_SHUTDOWN_SENSE",
-        12: "STATUS_EXT_SHUTDOWN",
-        13: "STATUS_DAC_OVER_THRESH",
-        14: "STATUS_ADC_OVER_THRESH",
-        15: "STATUS_DAC_THRESH_UNDERFLOW",
-        16: "STATUS_DAC_THRESH_OVERFLOW",
-        17: "STATUS_ADC_THRESH_UNDERFLOW",
-        18: "STATUS_ADC_THRESH_OVERFLOW",
-        19: "STATUS_DAC_BUF_UNDERFLOW",
-        20: "STATUS_DAC_BUF_OVERFLOW",
-        21: "STATUS_ADC_BUF_UNDERFLOW",
-        22: "STATUS_ADC_BUF_OVERFLOW",
-        23: "STATUS_PREMAT_DAC_TRIG",
-        24: "STATUS_PREMAT_ADC_TRIG",
-        25: "STATUS_PREMAT_DAC_DIV",
-        26: "STATUS_PREMAT_ADC_DIV",
-        27: "STATUS_DAC_BUF_FILL_TIMEOUT",
-        28: "STATUS_SPI_START_TIMEOUT"
+        0x0000: "STATUS_EMPTY",
+        0x0001: "STATUS_OK",
+        0x0002: "STATUS_PS_SHUTDOWN",
+        0x0100: "STATUS_SPI_START_TIMEOUT",
+        0x0101: "STATUS_SPI_INIT_TIMEOUT",
+        0x0200: "STATUS_INTEG_THRESH_AVG_OOB",
+        0x0201: "STATUS_INTEG_WINDOW_OOB",
+        0x0202: "STATUS_INTEG_EN_OOB",
+        0x0203: "STATUS_SYS_EN_OOB",
+        0x0204: "STATUS_LOCK_VIOL",
+        0x0300: "STATUS_SHUTDOWN_SENSE",
+        0x0301: "STATUS_EXT_SHUTDOWN",
+        0x0400: "STATUS_OVER_THRESH",
+        0x0401: "STATUS_THRESH_UNDERFLOW",
+        0x0402: "STATUS_THRESH_OVERFLOW",
+        0x0500: "STATUS_BAD_TRIG_CMD",
+        0x0501: "STATUS_TRIG_BUF_OVERFLOW",
+        0x0600: "STATUS_BAD_DAC_CMD",
+        0x0601: "STATUS_DAC_CAL_OOB",
+        0x0602: "STATUS_DAC_VAL_OOB",
+        0x0603: "STATUS_DAC_BUF_UNDERFLOW",
+        0x0604: "STATUS_DAC_BUF_OVERFLOW",
+        0x0605: "STATUS_UNEXP_DAC_TRIG",
+        0x0700: "STATUS_BAD_ADC_CMD",
+        0x0701: "STATUS_ADC_BUF_UNDERFLOW",
+        0x0702: "STATUS_ADC_BUF_OVERFLOW",
+        0x0703: "STATUS_ADC_DATA_BUF_UNDERFLOW",
+        0x0704: "STATUS_ADC_DATA_BUF_OVERFLOW",
+        0x0705: "STATUS_UNEXP_ADC_TRIG",
     }
 
     def __init__(self, dut, clk_period = 4, time_unit = "ns", 
                  SHUTDOWN_FORCE_DELAY = 25000000,
                  SHUTDOWN_RESET_PULSE = 25000,
                  SHUTDOWN_RESET_DELAY = 25000000,
-                 BUF_LOAD_WAIT = 25000000,
+                 SPI_INIT_WAIT = 25000000,
                  SPI_START_WAIT = 25000000
                  ):
         """
@@ -71,7 +72,7 @@ class hw_manager_base:
         self.SHUTDOWN_FORCE_DELAY = SHUTDOWN_FORCE_DELAY
         self.SHUTDOWN_RESET_PULSE = SHUTDOWN_RESET_PULSE
         self.SHUTDOWN_RESET_DELAY = SHUTDOWN_RESET_DELAY
-        self.BUF_LOAD_WAIT = BUF_LOAD_WAIT
+        self.SPI_INIT_WAIT = SPI_INIT_WAIT
         self.SPI_START_WAIT = SPI_START_WAIT
         
         self.clk_period = clk_period
@@ -80,38 +81,45 @@ class hw_manager_base:
         # Create clock
         cocotb.start_soon(Clock(self.dut.clk, clk_period, units=time_unit).start())  # Default is 250 MHz clock
         
-        # Set default values
+        # Set default values for inputs
         self.dut.sys_en.value = 0
-        self.dut.dac_buf_loaded.value = 0
-        self.dut.spi_running.value = 0
+        self.dut.spi_off.value = 1  # SPI starts powered off
         self.dut.ext_shutdown.value = 0
-        # Configuration values
-        self.dut.trig_lockout_oob.value = 0
-        self.dut.cal_offset_oob.value = 0
-        self.dut.dac_divider_oob.value = 0
+
+        # Pre-start configuration values
         self.dut.integ_thresh_avg_oob.value = 0
         self.dut.integ_window_oob.value = 0
         self.dut.integ_en_oob.value = 0
         self.dut.sys_en_oob.value = 0
         self.dut.lock_viol.value = 0
-        # Shutdown sense
-        self.dut.shutdown_sense.value = 0
-        # Integrator errors (all boards)
-        self.dut.dac_over_thresh.value = 0
-        self.dut.adc_over_thresh.value = 0
-        self.dut.dac_thresh_underflow.value = 0
-        self.dut.dac_thresh_overflow.value = 0
-        self.dut.adc_thresh_underflow.value = 0
-        self.dut.adc_thresh_overflow.value = 0
-        # DAC/ADC errors (all boards)
-        self.dut.dac_buf_underflow.value = 0
-        self.dut.dac_buf_overflow.value = 0
-        self.dut.adc_buf_underflow.value = 0
-        self.dut.adc_buf_overflow.value = 0
-        self.dut.premat_dac_trig.value = 0
-        self.dut.premat_adc_trig.value = 0
-        self.dut.premat_dac_div.value = 0
-        self.dut.premat_adc_div.value = 0
+
+        # Shutdown sense (8-bit per board)
+        self.dut.shutdown_sense.value = 0x00
+
+        # Integrator (8-bit per board)
+        self.dut.over_thresh.value = 0x00
+        self.dut.thresh_underflow.value = 0x00
+        self.dut.thresh_overflow.value = 0x00
+
+        # Trigger buffer and commands
+        self.dut.bad_trig_cmd.value = 0
+        self.dut.trig_buf_overflow.value = 0
+
+        # DAC buffers and commands (8-bit per board)
+        self.dut.bad_dac_cmd.value = 0x00
+        self.dut.dac_cal_oob.value = 0x00
+        self.dut.dac_val_oob.value = 0x00
+        self.dut.dac_cmd_buf_underflow.value = 0x00
+        self.dut.dac_cmd_buf_overflow.value = 0x00
+        self.dut.unexp_dac_trig.value = 0x00
+
+        # ADC buffers and commands (8-bit per board)
+        self.dut.bad_adc_cmd.value = 0x00
+        self.dut.adc_cmd_buf_underflow.value = 0x00
+        self.dut.adc_cmd_buf_overflow.value = 0x00
+        self.dut.adc_data_buf_underflow.value = 0x00
+        self.dut.adc_data_buf_overflow.value = 0x00
+        self.dut.unexp_adc_trig.value = 0x00
 
     def get_state_name(self, state_value):
         """Convert state value to state name"""
@@ -160,22 +168,23 @@ class hw_manager_base:
         self.dut._log.info(f"Status: {status_info['status_name']} ({status_info['status_code']})")
         if status_info['board_num'] > 0:
             self.dut._log.info(f"Board: {status_info['board_num']}")
-        self.dut._log.info("------------ OUTPUT SIGNALS AT TIME = {time}  ------------")
-        self.dut._log.info(f"  sys_rst: {self.dut.sys_rst.value}")
+        self.dut._log.info(f"------------ OUTPUT SIGNALS AT TIME = {time}  ------------")
+        self.dut._log.info(f"  unlock_cfg: {self.dut.unlock_cfg.value}")
+        self.dut._log.info(f"  spi_clk_power_n: {self.dut.spi_clk_power_n.value}")
+        self.dut._log.info(f"  spi_en: {self.dut.spi_en.value}")
+        self.dut._log.info(f"  shutdown_sense_en: {self.dut.shutdown_sense_en.value}")
+        self.dut._log.info(f"  trig_en: {self.dut.trig_en.value}")
         self.dut._log.info(f"  n_shutdown_force: {self.dut.n_shutdown_force.value}")
         self.dut._log.info(f"  n_shutdown_rst: {self.dut.n_shutdown_rst.value}")
-        self.dut._log.info(f"  dma_en: {self.dut.dma_en.value}")
-        self.dut._log.info(f"  spi_en: {self.dut.spi_en.value}")
-        self.dut._log.info(f"  trig_en: {self.dut.trig_en.value}")
         self.dut._log.info(f"  ps_interrupt: {self.dut.ps_interrupt.value}")
         self.dut._log.info("---------------------------------------------")
 
     async def reset(self):
-        """Reset the DUT"""
-        self.dut.rst.value = 1
+        """Reset the DUT using active low reset"""
+        self.dut.aresetn.value = 0  # Assert active low reset
         await RisingEdge(self.dut.clk)
         await RisingEdge(self.dut.clk)
-        self.dut.rst.value = 0
+        self.dut.aresetn.value = 1  # Deassert reset
         await RisingEdge(self.dut.clk)
         self.dut._log.info("RESET COMPLETE")
 
