@@ -16,7 +16,7 @@ module latch_high #(
   assign dout = latch | din;
 
   always @(posedge clk or negedge resetn) begin
-    if (~resetn) begin
+    if (!resetn) begin
       latch <= {WIDTH{1'b0}};
     end else begin
       latch <= latch | din;

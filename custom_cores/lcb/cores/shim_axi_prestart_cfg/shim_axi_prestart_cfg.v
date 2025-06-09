@@ -150,7 +150,7 @@ module shim_axi_prestart_cfg #
   assign int_initial_data_wire[INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET*32+INTEGRATOR_THRESHOLD_AVERAGE_WIDTH-1-:INTEGRATOR_THRESHOLD_AVERAGE_WIDTH] = INTEGRATOR_THRESHOLD_AVERAGE_DEFAULT_CAPPED;
   assign int_initial_data_wire[INTEGRATOR_WINDOW_32_OFFSET*32+INTEGRATOR_WINDOW_WIDTH-1-:INTEGRATOR_WINDOW_WIDTH] = INTEGRATOR_WINDOW_DEFAULT_CAPPED;
   assign int_initial_data_wire[INTEGRATOR_EN_32_OFFSET*32] = INTEG_EN_DEFAULT;
-  assign int_initial_data_wire[BUFFER_RESET_32_OFFSET*32+BUFFER_RESET_WIDTH-1-:BUFFER_RESET_WIDTH] = {BUFFER_RESET_WIDTH{1'b0}}; // Buffer reset defaults to 0 (but ~aresetn will override them to 1)
+  assign int_initial_data_wire[BUFFER_RESET_32_OFFSET*32+BUFFER_RESET_WIDTH-1-:BUFFER_RESET_WIDTH] = {BUFFER_RESET_WIDTH{1'b0}}; // Buffer reset defaults to 0 (but !aresetn will override them to 1)
   assign int_initial_data_wire[SYS_EN_32_OFFSET*32] = 0;
 
   // Out of bounds checks. Use the whole word for the check to avoid truncation
@@ -184,7 +184,7 @@ module shim_axi_prestart_cfg #
   // Configuration register sanitization logic
   always @(posedge aclk)
   begin
-    if(~aresetn)
+    if(!aresetn)
     begin
       int_bvalid_reg <= 1'b0;
       int_rvalid_reg <= 1'b0;

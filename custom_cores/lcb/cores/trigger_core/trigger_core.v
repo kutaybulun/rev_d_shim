@@ -1,0 +1,120 @@
+// trigger_core.v
+module trigger_core #(
+  parameter TRIGGER_LOCKOUT_DEFAULT = 5000
+) (
+  input  wire        clk,
+  input  wire        resetn,
+
+  // Command FIFO interface
+  output reg         cmd_word_rd_en,
+  input  wire [31:0] cmd_word,
+  input  wire        cmd_buf_empty,
+
+  // External signals
+  input  wire        ext_trigger,
+  input  wire [7:0]  dac_waiting_for_trigger,
+  input  wire [7:0]  adc_waiting_for_trigger,
+
+  // Outputs
+  output reg         trigger_out,
+  output reg         sync_done,
+  output reg         bad_cmd
+);
+  // Command encoding
+  localparam CMD_CANCEL          = 3'd1;
+  localparam CMD_SYNC_CH         = 3'd2;
+  localparam CMD_SET_LOCKOUT     = 3'd3;
+  localparam CMD_EXPECT_EXT_TRIG = 3'd4;
+  localparam CMD_DELAY           = 3'd5;
+  localparam CMD_FORCE_TRIG      = 3'd6;
+
+  // State encoding
+  localparam S_IDLE        = 3'd1;
+  localparam S_SYNC_CH     = 3'd2;
+  localparam S_EXPECT_TRIG = 3'd3;
+  localparam S_DELAY       = 3'd4;
+  localparam S_ERROR       = 3'd5;
+
+  // State machine info
+  reg  [2:0] state;
+  wire       cmd_done;
+  wire       next_cmd;
+  wire [2:0] next_cmd_state;
+
+  // Cancel and sync
+  wire cancel;
+  wire all_waiting;
+
+  // Command decode
+  wire [2:0] cmd_type = cmd_word[31:29];
+  wire [28:0] cmd_val = cmd_word[28:0];
+
+  // Command execution
+  reg [28:0] delay_counter;
+  reg [28:0] trig_counter;
+  reg [28:0] trig_lockout;
+  wire do_trigger;
+
+  // Checks for cancel command and synchronization conditions
+  assign cancel = !cmd_buf_empty && cmd_type == CMD_CANCEL;
+  assign all_waiting = &dac_waiting_for_trigger && &adc_waiting_for_trigger;
+  // Command done logic
+  assign cmd_done = (state == S_IDLE && !cmd_buf_empty)
+                  || (state == S_SYNC_CH && all_waiting)
+                  || (state == S_EXPECT_TRIG && trig_counter == 0)
+                  || (state == S_DELAY && delay_counter == 0)
+                  || (state != S_ERROR && cancel); // Allow cancel at any time
+  assign next_cmd = cmd_done && !cmd_buf_empty;
+  // Next state from upcoming command
+  assign next_cmd_state = cmd_buf_empty ? S_IDLE
+                          : (cmd_type == CMD_CANCEL || cmd_type == CMD_SET_LOCKOUT || cmd_type == CMD_FORCE_TRIG) ? S_IDLE
+                          : (cmd_type == CMD_SYNC_CH) ? (all_waiting ? S_IDLE : S_SYNC_CH) // If all channels are already waiting, go right to idle
+                          : (cmd_type == CMD_EXPECT_EXT_TRIG) ? ((|cmd_val) ? S_EXPECT_TRIG : S_IDLE) // Zero triggers goes right to idle
+                          : (cmd_type == CMD_DELAY) ? ((|cmd_val) ? S_DELAY : S_IDLE) // Zero delay goes right to idle
+                          : S_ERROR;
+  // State transition logic
+  always @(posedge clk) begin
+    if (!resetn) state <= S_IDLE; // Reset to idle
+    else if (cmd_done) state <= next_cmd_state; // Transition based on command done
+  end
+
+  //// Command execution logic
+  // Set lockout
+  always @(posedge clk) begin
+    if (!resetn) trig_lockout <= TRIGGER_LOCKOUT_DEFAULT;
+    else if (next_cmd && cmd_type == CMD_SET_LOCKOUT) trig_lockout <= cmd_val;
+  end
+  // Expected trigger count
+  always @(posedge clk) begin
+    if (!resetn || cancel || state == S_ERROR) trig_counter <= 0;
+    else if (next_cmd && cmd_type == CMD_EXPECT_EXT_TRIG) trig_counter <= cmd_val;
+    else if (state == S_EXPECT_TRIG && trig_counter > 0 && do_trigger) trig_counter <= trig_counter - 1;
+  end
+  // Delay counter, used in delay state and for external trigger lockout
+  always @(posedge clk) begin
+    if (!resetn || cancel || state == S_ERROR) delay_counter <= 0;
+    else if (next_cmd && cmd_type == CMD_DELAY) delay_counter <= cmd_val;
+    else if (state == S_EXPECT_TRIG && do_trigger) delay_counter <= trig_lockout; // Set to lockout delay after trigger
+    else if (delay_counter > 0) delay_counter <= delay_counter - 1;
+  end
+  // Trigger pulse generation
+  assign do_trigger = (next_cmd && cmd_type == CMD_FORCE_TRIG) // Force trigger
+                      || (next_cmd && cmd_type == CMD_SYNC_CH && all_waiting) // Sync channels edge case where all channels are already waiting
+                      || (state == S_SYNC_CH && all_waiting) // Sync channels when all are waiting
+                      || (state == S_EXPECT_TRIG && delay_counter == 0 && ext_trigger); // External trigger when expected and lockout is done
+  always @(posedge clk) begin
+    if (!resetn || cancel || state == S_ERROR) trigger_out <= 0;
+    else trigger_out <= do_trigger; // Trigger pulse
+  end
+
+  //// Error handling
+  // Bad command
+  always @(posedge clk) begin
+    if (!resetn) bad_cmd <= 0;
+    else if (next_cmd && next_cmd_state == S_ERROR) bad_cmd <= 1;
+  end
+
+  //// Read enable
+  assign cmd_word_rd_en = next_cmd && !bad_cmd;
+
+endmodule

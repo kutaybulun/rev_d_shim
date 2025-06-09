@@ -9,7 +9,7 @@ module shutdown_sense (
 );
 
   always @(posedge clk) begin
-    if (~shutdown_sense_en) begin
+    if (!shutdown_sense_en) begin
       // Disabled state
       shutdown_sense_sel <= 3'b000;
       shutdown_sense <= 8'b00000000;

@@ -71,7 +71,7 @@ module axis_fifo_sync #
     .overflow(overflow),
     .wr_data_count(write_count),
     .rd_data_count(read_count),
-    .rst(~aresetn),
+    .rst(!aresetn),
     .wr_clk(aclk),
     .wr_en(s_axis_tvalid),
     .din(s_axis_tdata),
@@ -87,7 +87,7 @@ module axis_fifo_sync #
     end
     else
     begin : BLOCKING_INPUT
-      assign s_axis_tready = ~full;
+      assign s_axis_tready = !full;
     end
   endgenerate
 
@@ -101,7 +101,7 @@ module axis_fifo_sync #
     else
     begin : BLOCKING_OUTPUT
       assign m_axis_tdata = int_data_wire;
-      assign m_axis_tvalid = ~empty;
+      assign m_axis_tvalid = !empty;
     end
   endgenerate
 

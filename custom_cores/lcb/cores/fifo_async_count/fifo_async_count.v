@@ -65,10 +65,10 @@ module fifo_asynch_count #(
 
     // Write logic
     always @(posedge wr_clk or negedge wr_rst_n) begin
-        if (~wr_rst_n) begin
+        if (!wr_rst_n) begin
             wr_ptr_bin <= 0;
             wr_ptr_gray <= 0;
-        end else if (wr_en && ~full) begin
+        end else if (wr_en && !full) begin
             wr_ptr_bin <= wr_ptr_bin + 1;
             wr_ptr_gray <= binary_to_gray(wr_ptr_bin + 1);
         end
@@ -77,7 +77,7 @@ module fifo_asynch_count #(
     // Read logic
     always @* rd_ptr_bin_next = rd_ptr_bin + (rd_en & ~empty);
     always @(posedge rd_clk or negedge rd_rst_n) begin
-        if (~rd_rst_n) begin
+        if (!rd_rst_n) begin
             rd_ptr_bin <= 0;
             rd_ptr_gray <= 0;
         end else begin
@@ -90,7 +90,7 @@ module fifo_asynch_count #(
     // Use double-flop synchronizers for wr_ptr in read clock domain
     reg [ADDR_WIDTH:0] wr_ptr_gray_rd_clk_sync1, wr_ptr_gray_rd_clk_sync2;
     always @(posedge rd_clk or negedge rd_rst_n) begin
-        if (~rd_rst_n) begin
+        if (!rd_rst_n) begin
             wr_ptr_gray_rd_clk_sync1 <= 0;
             wr_ptr_gray_rd_clk_sync2 <= 0;
         end else begin
@@ -105,7 +105,7 @@ module fifo_asynch_count #(
     // Use double-flop synchronizers for rd_ptr in write clock domain
     reg [ADDR_WIDTH:0] rd_ptr_gray_wr_clk_sync1, rd_ptr_gray_wr_clk_sync2;
     always @(posedge wr_clk or negedge wr_rst_n) begin
-        if (~wr_rst_n) begin
+        if (!wr_rst_n) begin
             rd_ptr_gray_wr_clk_sync1 <= 0;
             rd_ptr_gray_wr_clk_sync2 <= 0;
         end else begin

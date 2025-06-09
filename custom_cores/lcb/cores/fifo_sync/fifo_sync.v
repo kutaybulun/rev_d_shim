@@ -39,7 +39,7 @@ module fifo_sync #(
 
     // Write logic
     always @(posedge clk) begin
-        if (~resetn) begin
+        if (!resetn) begin
             wr_ptr_bin <= 0;
         end else if (wr_en) begin
             wr_ptr_bin <= wr_ptr_bin + 1;
@@ -50,7 +50,7 @@ module fifo_sync #(
     always @* rd_ptr_bin_nxt = rd_ptr_bin + (rd_en & ~empty);
     // Update read pointer on clock edge
     always @(posedge clk) begin
-        if (~resetn) begin
+        if (!resetn) begin
             rd_ptr_bin <= 0;
         end else begin
             rd_ptr_bin <= rd_ptr_bin_nxt;

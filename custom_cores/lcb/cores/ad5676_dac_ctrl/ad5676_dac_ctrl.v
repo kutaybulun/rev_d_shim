@@ -28,33 +28,6 @@ module ad5676_dac_ctrl #(
   output reg         ldac
 );
 
-  // State and command processing registers
-  reg [ 2:0] state;
-  reg        cmd_finished;
-  reg [ 2:0] next_cmd_state;
-  // Command word processing bits
-  reg        do_ldac;
-  reg        wait_for_trigger;
-  reg        expect_next;
-  // Timer
-  reg [24:0] timer;
-  // Calibration
-  reg signed [15:0] cal_val [0:7]; // Calibration values for each channel
-  // DAC control signals
-  reg        read_next_dac_word;
-  reg        dac_ready;
-  reg [ 5:0] dac_update_timer;
-  reg [ 2:0] dac_channel;
-  wire       last_dac_channel;
-  reg [ 4:0] dac_spi_bit;
-  reg signed [15:0] first_dac_val_signed;
-  reg signed [16:0] first_dac_val_cal_signed;
-  reg signed [15:0] second_dac_val_signed;
-  reg signed [16:0] second_dac_val_cal_signed;
-  reg [47:0] dac_shift_reg; // Shift register for DAC SPI data
-  reg [14:0] abs_dac_val [0:7]; // Stored absolute DAC values for each channel
-  reg [ 1:0] dac_load_stage;
-
   // Internal constants
   localparam DAC_UPDATE_TIME = 6'd41; // Minimum DAC delay clock cycles (minus 1)
   localparam DAC_SPI_START_TIME = 6'd34; // Mildly arbitrary delay after starting DAC write cycle to start the SPI transfer (should be over 26)
@@ -63,12 +36,12 @@ module ad5676_dac_ctrl #(
   localparam SPI_CMD_REG_WRITE = 4'b0001; // DAC SPI command for register write to be later loaded with LDAC
 
   // States
-  localparam INIT = 3'd0; // Initial state
-  localparam IDLE = 3'd1; // Idle state, waiting for commands
-  localparam DELAY = 3'd2; // Delay state, waiting for timer to expire
-  localparam TRIG_WAIT = 3'd3; // Waiting for trigger state
-  localparam DAC_WR = 3'd4; // DAC write state
-  localparam ERROR = 3'd5; // Error state, invalid command or unexpected condition
+  localparam S_INIT = 3'd0; // Initial state
+  localparam S_IDLE = 3'd1; // Idle state, waiting for commands
+  localparam S_DELAY = 3'd2; // Delay state, waiting for timer to expire
+  localparam S_TRIG_WAIT = 3'd3; // Waiting for trigger state
+  localparam S_DAC_WR = 3'd4; // DAC write state
+  localparam S_ERROR = 3'd5; // Error state, invalid command or unexpected condition
 
   // Command types
   localparam CMD_NO_OP = 2'b00;
@@ -79,41 +52,67 @@ module ad5676_dac_ctrl #(
   localparam TRIG_BIT = 28; // Bit position for TRIGGER WAIT in the command word
   localparam CONT_BIT = 27; // Bit position for CONTINUE in the command word
 
+  // State and command processing
+  reg  [ 2:0] state;
+  wire        cmd_done;
+  wire        next_cmd;
+  wire [ 2:0] next_cmd_state;
+  // Command word processing bits
+  reg        do_ldac;
+  reg        wait_for_trigger;
+  reg        expect_next;
+  // Timer
+  reg  [24:0] timer;
+  // Calibration
+  reg  signed [15:0] cal_val [0:7]; // Calibration values for each channel
+  // DAC control signals
+  reg        read_next_dac_word;
+  reg        dac_ready;
+  reg  [ 5:0] dac_update_timer;
+  reg  [ 2:0] dac_channel;
+  wire       last_dac_channel;
+  reg  [ 4:0] dac_spi_bit;
+  reg  signed [15:0] first_dac_val_signed;
+  reg  signed [16:0] first_dac_val_cal_signed;
+  reg  signed [15:0] second_dac_val_signed;
+  reg  signed [16:0] second_dac_val_cal_signed;
+  reg  [47:0] dac_shift_reg; // Shift register for DAC SPI data
+  reg  [14:0] abs_dac_val [0:7]; // Stored absolute DAC values for each channel
+  reg  [ 1:0] dac_load_stage;
+
 
   //// State machine transitions
   // Current command is finished
-  always @* begin
-    cmd_finished = (state == IDLE && ~cmd_buf_empty) 
-                  || (state == DELAY && timer == 0)
-                  || (state == TRIG_WAIT && trigger)
-                  || (state == DAC_WR && dac_ready && ~wait_for_trigger && timer == 0);
-  end
-   // Next state from upcoming command
-  always @* begin
-    next_cmd_state =  cmd_buf_empty ? expect_next ? ERROR : IDLE : // If buffer is empty, error if expecting next command, otherwise IDLE
-                      (cmd_word[31:30] == CMD_NO_OP) ? cmd_word[TRIG_BIT] ? TRIG_WAIT : DELAY : // If command is NO_OP, either wait for trigger or delay depending on TRIG_BIT
-                      (cmd_word[31:30] == CMD_DAC_WR) ? DAC_WR : // If command is DAC write, go to DAC_WR state
-                      (cmd_word[31:30] == CMD_SET_CAL) ? IDLE : // If command is SET_CAL, go to IDLE
-                      ERROR; // If command is not recognized, go to ERROR state
-  end
+  assign cmd_done = (state == S_IDLE && !cmd_buf_empty) 
+                    || (state == S_DELAY && timer == 0)
+                    || (state == S_TRIG_WAIT && trigger)
+                    || (state == S_DAC_WR && dac_ready && !wait_for_trigger && timer == 0);
+  assign next_cmd = cmd_done && !cmd_buf_empty;
+  // Next state from upcoming command
+  assign next_cmd_state =  cmd_buf_empty ? (expect_next ? S_ERROR : S_IDLE) // If buffer is empty, error if expecting next command, otherwise IDLE
+                           : (cmd_word[31:30] == CMD_NO_OP) ? (cmd_word[TRIG_BIT] ? S_TRIG_WAIT : S_DELAY) // If command is NO_OP, either wait for trigger or delay depending on TRIG_BIT
+                           : (cmd_word[31:30] == CMD_DAC_WR) ? S_DAC_WR // If command is DAC write, go to DAC_WR state
+                           : (cmd_word[31:30] == CMD_SET_CAL) ? S_IDLE // If command is SET_CAL, go to IDLE
+                           : S_ERROR; // If command is not recognized, go to ERROR state
   // Waiting for trigger flag
-  assign waiting_for_trigger = (state == TRIG_WAIT);
+  assign waiting_for_trigger = (state == S_TRIG_WAIT);
   // State transition logic
   always @(posedge clk) begin
-    if (~resetn) state <= INIT; // Reset to initial state
-    else if (state == INIT) state <= IDLE; // Transition from INIT to IDLE
-    else if (cal_oob) state <= ERROR; // Error if calibration value is out of bounds
-    else if (trigger && !waiting_for_trigger) state <= ERROR; // Error if trigger occurs when not waiting for one
-    else if (ldac_shared && state == DAC_WR) state <= ERROR; // Error if global LDAC is asserted while this DAC is writing
-    else if (read_next_dac_word && cmd_buf_empty) state <= ERROR; // Error if DAC sample is expected but buffer is empty
-    else if (cmd_finished) state <= next_cmd_state; // Transition to state of next command if command is finished
-    else if (state == DAC_WR && dac_ready) state <= wait_for_trigger ? TRIG_WAIT : DELAY; // If the DAC write is done, go to the proper wait state
-    else if (state == DAC_WR && dac_val_oob) state <= ERROR; // Error if calibrated DAC value is out of bounds
+    if (!resetn) state <= S_INIT; // Reset to initial state
+    else if (state == S_INIT) state <= S_IDLE; // Transition from INIT to IDLE
+    else if (cal_oob) state <= S_ERROR; // Error if calibration value is out of bounds
+    else if (trigger && !waiting_for_trigger) state <= S_ERROR; // Error if trigger occurs when not waiting for one
+    else if (ldac_shared && state == S_DAC_WR) state <= S_ERROR; // Error if global LDAC is asserted while this DAC is writing
+    else if (read_next_dac_word && cmd_buf_empty) state <= S_ERROR; // Error if DAC sample is expected but buffer is empty
+    else if (cmd_done) state <= next_cmd_state; // Transition to state of next command if command is finished
+    else if (state == S_DAC_WR && dac_ready) state <= wait_for_trigger ? S_TRIG_WAIT : S_DELAY; // If the DAC write is done, go to the proper wait state
+    else if (state == S_DAC_WR && dac_val_oob) state <= S_ERROR; // Error if calibrated DAC value is out of bounds
+    else state <= state; // Stay in the same state if no conditions are met
   end
   // Setup done logic
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) setup_done <= 1'b0; // Reset setup done on reset or error
-    else if (state == INIT) setup_done <= 1'b1; // Set setup done when entering INIT state
+    if (!resetn || state == S_ERROR) setup_done <= 1'b0; // Reset setup done on reset or error
+    else if (state == S_INIT) setup_done <= 1'b1; // Set setup done when entering INIT state
   end
 
 
@@ -122,11 +121,11 @@ module ad5676_dac_ctrl #(
   //// Command bits processing
   // do_ldac, wait_for_trigger, expect_next logic
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) begin
+    if (!resetn || state == S_ERROR) begin
       do_ldac <= 1'b0;
       wait_for_trigger <= 1'b0;
       expect_next <= 1'b0;
-    end else if (cmd_finished && ~cmd_buf_empty && next_cmd_state != ERROR) begin
+    end else if (next_cmd && next_cmd_state != S_ERROR) begin
       do_ldac <= cmd_word[LDAC_BIT]; // Set do_ldac based on command word
       wait_for_trigger <= cmd_word[TRIG_BIT]; // Set wait_for_trigger based on command word
       expect_next <= cmd_word[CONT_BIT]; // Set expect_next based on command word
@@ -134,17 +133,17 @@ module ad5676_dac_ctrl #(
   end
   // Command word read enable logic
   always @* begin
-    cmd_word_rd_en = state != ERROR && ~cmd_buf_empty && 
-                     (read_next_dac_word || cmd_finished);
+    cmd_word_rd_en = state != S_ERROR && !cmd_buf_empty && 
+                     (read_next_dac_word || cmd_done);
   end
 
 
   //// Timer logic
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) timer <= 25'd0;
-    else if (cmd_finished && next_cmd_state != ERROR) begin
+    if (!resetn || state == S_ERROR) timer <= 25'd0;
+    else if (cmd_done && next_cmd_state != S_ERROR) begin
       // If the next command is a delay or DAC write with a delay, load the timer
-      if (next_cmd_state == DELAY || (next_cmd_state == DAC_WR && ~cmd_word[TRIG_BIT])) begin
+      if (next_cmd_state == S_DELAY || (next_cmd_state == S_DAC_WR && !cmd_word[TRIG_BIT])) begin
         timer <= cmd_word[24:0]; // Load timer with delay value from command word
       end
     end else if (timer > 0) timer <= timer - 1; // Decrement timer
@@ -154,34 +153,34 @@ module ad5676_dac_ctrl #(
   //// Errors
   // Unexpected trigger logic
   always @(posedge clk) begin
-    if (~resetn) unexp_trig <= 1'b0;
-    else if (state != TRIG_WAIT && trigger) unexp_trig <= 1'b1; // Unexpected trigger if triggered while not waiting for one
-    else if (state == DAC_WR && ldac_shared) unexp_trig <= 1'b1; // Unexpected trigger if global LDAC is asserted while writing
+    if (!resetn) unexp_trig <= 1'b0;
+    else if (state != S_TRIG_WAIT && trigger) unexp_trig <= 1'b1; // Unexpected trigger if triggered while not waiting for one
+    else if (state == S_DAC_WR && ldac_shared) unexp_trig <= 1'b1; // Unexpected trigger if global LDAC is asserted while writing
     
   end
   // Bad command logic
   always @(posedge clk) begin
-    if (~resetn) bad_cmd <= 1'b0;
-    else if (cmd_finished && ~cmd_buf_empty && next_cmd_state == ERROR) bad_cmd <= 1'b1; // Bad command if next command is parsed as ERROR
+    if (!resetn) bad_cmd <= 1'b0;
+    else if (next_cmd && next_cmd_state == S_ERROR) bad_cmd <= 1'b1; // Bad command if next command is parsed as ERROR
   end
   // Command buffer underflow logic
   always @(posedge clk) begin
-    if (~resetn) cmd_buf_underflow <= 1'b0;
-    else if (((cmd_finished && expect_next) || read_next_dac_word) && cmd_buf_empty) cmd_buf_underflow <= 1'b1; // Underflow if expecting buffer item but buffer is empty
+    if (!resetn) cmd_buf_underflow <= 1'b0;
+    else if (((cmd_done && expect_next) || read_next_dac_word) && cmd_buf_empty) cmd_buf_underflow <= 1'b1; // Underflow if expecting buffer item but buffer is empty
   end
   
 
   // LDAC activation logic
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) ldac <= 1'b0;
-    else if (do_ldac && cmd_finished) begin
+    if (!resetn || state == S_ERROR) ldac <= 1'b0;
+    else if (do_ldac && cmd_done) begin
       ldac <= 1'b1; // If do_ldac is set, activate LDAC at the end of the command (except for IDLE)
     end
     else ldac <= 1'b0; // Otherwise, deactivate LDAC
   end
   // Update absolute DAC values concatenation
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) abs_dac_val_concat <= 120'd0; // Reset concatenation on reset or error
+    if (!resetn || state == S_ERROR) abs_dac_val_concat <= 120'd0; // Reset concatenation on reset or error
     else if (ldac) begin
       // Concatenate absolute DAC values when LDAC is asserted
       abs_dac_val_concat <= {abs_dac_val[7], abs_dac_val[6], abs_dac_val[5], 
@@ -195,7 +194,7 @@ module ad5676_dac_ctrl #(
   //// Calibration
   // Calibration value set and out-of-bounds logic
   always @(posedge clk) begin
-    if (~resetn) begin
+    if (!resetn) begin
       cal_val[0] <= 16'd0;
       cal_val[1] <= 16'd0;
       cal_val[2] <= 16'd0;
@@ -205,7 +204,7 @@ module ad5676_dac_ctrl #(
       cal_val[6] <= 16'd0;
       cal_val[7] <= 16'd0;
       cal_oob <= 1'b0;
-    end else if (cmd_finished && next_cmd_state == IDLE && cmd_word[31:30] == CMD_SET_CAL) begin
+    end else if (next_cmd && cmd_word[31:30] == CMD_SET_CAL) begin
       if ($signed(cmd_word[15:0]) <= $signed(ABS_CAL_MAX) && $signed(cmd_word[15:0]) >= -$signed(ABS_CAL_MAX)) begin
         cal_val[cmd_word[18:16]] <= cmd_word[15:0]; // Set calibration value for the channel if within bounds
       end else begin
@@ -219,35 +218,35 @@ module ad5676_dac_ctrl #(
   assign last_dac_channel = &dac_channel; // Last channel is when all bits are set
   // Read next DAC word logic
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) read_next_dac_word <= 1'b0;
+    if (!resetn || state == S_ERROR) read_next_dac_word <= 1'b0;
     // If next command is DAC write, immediately read next DAC word (two channels)
-    else if (cmd_finished && next_cmd_state == DAC_WR) read_next_dac_word <= 1'b1;
+    else if (next_cmd && next_cmd_state == S_DAC_WR) read_next_dac_word <= 1'b1;
     // If writing to DAC and finished the second channel (every other, but not on ch 7), read the next word (two channels)
-    else if (state == DAC_WR && dac_channel[0] && ~last_dac_channel && dac_update_timer == 0) read_next_dac_word <= 1'b1;
+    else if (state == S_DAC_WR && dac_channel[0] && !last_dac_channel && dac_update_timer == 0) read_next_dac_word <= 1'b1;
     else read_next_dac_word <= 1'b0;
   end
   // DAC word timer logic
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) dac_update_timer <= 6'd0;
-    else if (cmd_finished && next_cmd_state == DAC_WR) dac_update_timer <= DAC_UPDATE_TIME;
-    else if (state == DAC_WR && dac_update_timer == 0 && ~last_dac_channel) dac_update_timer <= DAC_UPDATE_TIME;
-    else if (state == DAC_WR && dac_update_timer > 0) dac_update_timer <= dac_update_timer - 1;
+    if (!resetn || state == S_ERROR) dac_update_timer <= 6'd0;
+    else if (next_cmd && next_cmd_state == S_DAC_WR) dac_update_timer <= DAC_UPDATE_TIME;
+    else if (state == S_DAC_WR && dac_update_timer == 0 && !last_dac_channel) dac_update_timer <= DAC_UPDATE_TIME;
+    else if (state == S_DAC_WR && dac_update_timer > 0) dac_update_timer <= dac_update_timer - 1;
   end
   // DAC ready logic
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) dac_ready <= 1'b0;
-    else if (state == DAC_WR && dac_update_timer == 0 && last_dac_channel) dac_ready <= 1'b1; // Ready when all channels are written
+    if (!resetn || state == S_ERROR) dac_ready <= 1'b0;
+    else if (state == S_DAC_WR && dac_update_timer == 0 && last_dac_channel) dac_ready <= 1'b1; // Ready when all channels are written
     else dac_ready <= 1'b0; // Not ready otherwise
   end
   // DAC channel logic
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) dac_channel <= 3'd0;
-    else if (cmd_finished && next_cmd_state == DAC_WR) dac_channel <= 3'd0;
-    else if (state == DAC_WR && dac_update_timer == 0) dac_channel <= dac_channel + 1; // Increment channel when timer is done
+    if (!resetn || state == S_ERROR) dac_channel <= 3'd0;
+    else if (next_cmd && next_cmd_state == S_DAC_WR) dac_channel <= 3'd0;
+    else if (state == S_DAC_WR && dac_update_timer == 0) dac_channel <= dac_channel + 1; // Increment channel when timer is done
   end
   // DAC value loading logic
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) begin
+    if (!resetn || state == S_ERROR) begin
       first_dac_val_signed <= 16'd0;
       first_dac_val_cal_signed <= 17'd0;
       second_dac_val_signed <= 16'd0;
@@ -264,9 +263,9 @@ module ad5676_dac_ctrl #(
     end else 
       case (dac_load_stage)
         2'b00: begin // Initial stage, waiting for the first DAC value to be loaded
-          if (read_next_dac_word && ~cmd_buf_empty) begin
+          if (read_next_dac_word && !cmd_buf_empty) begin
             // Reject DAC value of 0xFFFF
-            if (~(cmd_word[15:0] == 16'hFFFF || cmd_word[31:16] == 16'hFFFF))  begin
+            if (!(cmd_word[15:0] == 16'hFFFF || cmd_word[31:16] == 16'hFFFF))  begin
               first_dac_val_signed <= offset_to_signed(cmd_word[15:0]); // Load first DAC value from command word
               second_dac_val_signed <= offset_to_signed(cmd_word[31:16]); // Load second DAC value from command word
               dac_load_stage <= 2'b01; // Move to next stage
@@ -289,10 +288,10 @@ module ad5676_dac_ctrl #(
   end
   // DAC val out of bounds logic
   always @(posedge clk) begin
-    if (~resetn) dac_val_oob <= 1'b0; // Reset out of bounds flag on reset
+    if (!resetn) dac_val_oob <= 1'b0; // Reset out of bounds flag on reset
     else begin // Set out of bounds flag if either of the following conditions are met:
       if (dac_load_stage == 2'b00
-          && read_next_dac_word && ~cmd_buf_empty 
+          && read_next_dac_word && !cmd_buf_empty 
           && (cmd_word[15:0] == 16'hFFFF || cmd_word[31:16] == 16'hFFFF)) dac_val_oob <= 1'b1; // If incoming DAC value is 0xFFFF
       else if (dac_load_stage == 2'b10 && 
                (first_dac_val_cal_signed < -16'sd32767 || first_dac_val_cal_signed > 16'sd32767 ||
@@ -301,19 +300,19 @@ module ad5676_dac_ctrl #(
   end
   // DAC SPI bit logic
   always @(posedge clk) begin
-    if (~resetn || state != DAC_WR) dac_spi_bit <= 5'd0;
-    else if (state == DAC_WR && dac_update_timer == DAC_SPI_START_TIME) dac_spi_bit <= 5'd24;
-    else if (state == DAC_WR && dac_spi_bit > 0) dac_spi_bit <= dac_spi_bit - 1; // Decrement SPI bit counter
+    if (!resetn || state != S_DAC_WR) dac_spi_bit <= 5'd0;
+    else if (state == S_DAC_WR && dac_update_timer == DAC_SPI_START_TIME) dac_spi_bit <= 5'd24;
+    else if (state == S_DAC_WR && dac_spi_bit > 0) dac_spi_bit <= dac_spi_bit - 1; // Decrement SPI bit counter
   end
   // SPI MOSI bits
   assign mosi = dac_shift_reg[47]; // MOSI is the most significant bit of the shift register
   always @(posedge clk) begin
-    if (~resetn || state == ERROR) dac_shift_reg <= 48'd0; // Reset shift register on reset or error
-    else if (state == DAC_WR && dac_load_stage == 2'b10) begin
+    if (!resetn || state == S_ERROR) dac_shift_reg <= 48'd0; // Reset shift register on reset or error
+    else if (state == S_DAC_WR && dac_load_stage == 2'b10) begin
       // Load the shift register with the first DAC value and the second DAC value
       dac_shift_reg <= {spi_write_cmd(dac_channel, signed_to_offset(first_dac_val_cal_signed)), 
                         spi_write_cmd(dac_channel + 1, signed_to_offset(second_dac_val_cal_signed))};
-    end else if (state == DAC_WR && dac_spi_bit > 0) dac_shift_reg <= {dac_shift_reg[46:0], 1'b0}; // Shift left
+    end else if (state == S_DAC_WR && dac_spi_bit > 0) dac_shift_reg <= {dac_shift_reg[46:0], 1'b0}; // Shift left
   end
 
   // Convert from offset to signed     

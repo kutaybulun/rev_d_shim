@@ -81,7 +81,7 @@ module shim_spi_cfg_sync (
 
   // Update stable registers when all signals are stable and spi_en_sync is high
   always @(posedge spi_clk) begin
-    if (~sync_resetn) begin
+    if (!sync_resetn) begin
       integ_thresh_avg_stable  <= 15'b0;
       integ_window_stable      <= 32'b0;
       integ_en_stable          <= 1'b0;

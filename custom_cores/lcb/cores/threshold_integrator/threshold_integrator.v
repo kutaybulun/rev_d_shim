@@ -86,7 +86,7 @@ module threshold_integrator (
   //// Global logic
   always @(posedge clk) begin : global_logic
     // Reset logic
-    if (~resetn) begin : reset_logic
+    if (!resetn) begin : reset_logic
       // Zero all individual signals
       max_value <= 0;
       sample_size <= 0;
@@ -267,7 +267,7 @@ module threshold_integrator (
       assign inflow_value[i] = abs_sample_concat[((i+1)*15)-1 -: 15];
 
       always @(posedge clk) begin : channel_logic
-        if (~resetn) begin : channel_reset
+        if (!resetn) begin : channel_reset
           // Zero all per-channel signals
           inflow_sample_sum[i] = 0;
           queued_fifo_in_sample_sum[i] = 0;
@@ -281,7 +281,7 @@ module threshold_integrator (
 
           //// Inflow logic
           // Only sample every 16th clock cycle
-          if (~|inflow_sample_timer) begin
+          if (!|inflow_sample_timer) begin
             // Inflow addition logic
             if (inflow_sample_timer != 0) begin // Add to sample sum
               inflow_sample_sum[i] <= inflow_sample_sum[i] + inflow_value[i];
@@ -306,7 +306,7 @@ module threshold_integrator (
 
           //// Sum logic
           // Pipeline the delta to the running total
-          if (~|outflow_timer) begin // Only add every 16th clock cycle
+          if (!|outflow_timer) begin // Only add every 16th clock cycle
             sum_delta[i] <= ((outflow_timer >> 4) < outflow_remainder[i])
                     ? $signed({2'b00, inflow_value[i]}) - $signed({1'b0, outflow_value_plus_one[i]})
                     : $signed({2'b00, inflow_value[i]}) - $signed({2'b00, outflow_value[i]});
