@@ -23,6 +23,6 @@ hw_manager_test:
 	$(MAKE) sim MODULE=hw_manager_test TOPLEVEL=hw_manager
 
 clean_test:
-	rm -rf __pycache__ results.xml sim_build dump.vcd
+	rm -rf __pycache__ results.xml sim_build dump.vcd hw_manager_coverage.xml hw_manager_coverage.yaml
 
 include $(shell cocotb-config --makefiles)/Makefile.sim

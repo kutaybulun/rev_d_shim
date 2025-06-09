@@ -3,6 +3,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, FallingEdge, Timer, ReadOnly
 from cocotb.regression import TestFactory
 from cocotb.result import TestFailure
+from cocotb_coverage.coverage import CoverPoint, coverage_db, CoverCross
 
 class hw_manager_base:
     """
@@ -181,11 +182,12 @@ class hw_manager_base:
 
     async def reset(self):
         """Reset the DUT using active low reset"""
+        await RisingEdge(self.dut.clk)  # Wait for clock to stabilize
         self.dut.aresetn.value = 0  # Assert active low reset
-        await RisingEdge(self.dut.clk)
-        await RisingEdge(self.dut.clk)
+        await RisingEdge(self.dut.clk) # Where the reset is sampled
+        await RisingEdge(self.dut.clk) # 2 clock cycles after reset
         self.dut.aresetn.value = 1  # Deassert reset
-        await RisingEdge(self.dut.clk)
+        await RisingEdge(self.dut.clk) # Where the reset deassert is sampled
         self.dut._log.info("RESET COMPLETE")
 
     async def check_state_and_status(self, expected_state, expected_status_code, expected_board_num=0):

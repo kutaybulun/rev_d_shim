@@ -1,6 +1,7 @@
 import cocotb
 from cocotb.triggers import RisingEdge , Timer, ReadOnly, FallingEdge
 from hw_manager_base import hw_manager_base
+from hw_manager_coverage import start_coverage_monitor
 
 # Create a setup function that can be called by each test
 async def setup_testbench(dut):
@@ -47,9 +48,10 @@ async def normal_start_up_with_no_log(dut):
 @cocotb.test()
 async def test_configuration_errors(dut):
     tb = await setup_testbench(dut)
-
-    
     tb.dut._log.info("STARTING TEST: test_configuration_errors")
+    
+    # Start coverage monitor
+    start_coverage_monitor(dut)
 
     # Error conditions to test for
     error_conditions = [
@@ -83,6 +85,9 @@ async def test_normal_startup(dut):
 
     # Initialize and reset
     await tb.reset()
+
+    # Start coverage monitor
+    start_coverage_monitor(dut)
     
     # Verify we start in IDLE state
     await tb.check_state_and_status(1, 1)  # IDLE = 1, STATUS_OK = 1
@@ -141,6 +146,9 @@ async def test_halted_to_idle(dut):
     tb = await normal_start_up_with_no_log(dut)
     tb.dut._log.info("STARTING TEST: test_halted_to_idle")
 
+    # Start coverage monitor
+    start_coverage_monitor(dut)
+
     # Simulate a runtime error
     await RisingEdge(dut.clk)
     dut.lock_viol.value = 1
@@ -168,9 +176,13 @@ async def test_halted_to_idle(dut):
 @cocotb.test()
 async def test_runtime_errors(dut):
 
+    # Start coverage monitor
+    start_coverage_monitor(dut)
+
     error_conditions = [
         (dut.sys_en, 0x0002, "STATUS_PS_SHUTDOWN"),
         (dut.lock_viol, 0x0204, "STATUS_LOCK_VIOL"),
+        (dut.shutdown_sense, 0x0300, "STATUS_SHUTDOWN_SENSE"),
         (dut.ext_shutdown, 0x0301, "STATUS_EXT_SHUTDOWN"),
         (dut.over_thresh, 0x0400, "STATUS_OVER_THRESH"),
         (dut.thresh_underflow, 0x0401, "STATUS_THRESH_UNDERFLOW"),
@@ -224,22 +236,23 @@ async def test_spi_init_timeout(dut):
     # Initialize and reset
     await tb.reset()
 
+    # Start coverage monitor
+    start_coverage_monitor(dut)
+
     # Enable the system
     dut.sys_en.value = 1
     dut.spi_off.value = 0 
 
     # Wait for CONFIRM_SPI_INIT state
     await tb.wait_for_state(2, None, True, 10)
+    await RisingEdge(dut.clk)
 
     # Simulate SPI init timeout
     tb.dut._log.info(f"SPI INIT WAIT parameter is {dut.SPI_INIT_WAIT.value}")
     tb.dut._log.info(f"Simulating SPI init timeout, waiting for {tb.SPI_INIT_WAIT} cycles")
     await tb.wait_cycles(tb.SPI_INIT_WAIT)
+    tb.dut._log.info(f"timer value is {int(dut.timer.value)}, maximum wait time was {tb.SPI_INIT_WAIT}")
     await RisingEdge(dut.clk)
-
-    await ReadOnly()  # Ensure all signals are updated
-    if(int(dut.timer.value) > tb.SPI_INIT_WAIT):
-        tb.dut._log.info(f"timer value is {int(dut.timer.value)}, maximum wait time was {tb.SPI_INIT_WAIT}")
 
     await tb.check_state_and_status(8, 0x0101)  # HALTED = 8, STATUS_SPI_INIT_TIMEOUT = 0x0101
     assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
@@ -258,6 +271,9 @@ async def test_spi_start_timeout(dut):
     # Initialize and reset
     await tb.reset()
 
+    # Start coverage monitor
+    start_coverage_monitor(dut)
+
     # Enable the system
     dut.sys_en.value = 1
     dut.spi_off.value = 1  # SPI starts off
@@ -273,10 +289,8 @@ async def test_spi_start_timeout(dut):
     tb.dut._log.info(f"SPI START WAIT parameter is {dut.SPI_START_WAIT.value}")
     tb.dut._log.info(f"Simulating SPI start timeout, waiting for {tb.SPI_START_WAIT} cycles")
     await tb.wait_cycles(tb.SPI_START_WAIT)
+    tb.dut._log.info(f"timer value is {int(dut.timer.value)}, maximum wait time was {tb.SPI_START_WAIT}")
     await RisingEdge(dut.clk)
-
-    if(int(dut.timer.value) > tb.SPI_START_WAIT):
-        tb.dut._log.info(f"timer value is {int(dut.timer.value)}, maximum wait time was {tb.SPI_START_WAIT}")
 
     await tb.check_state_and_status(8, 0x0100) # HALTED = 8, STATUS_SPI_START_TIMEOUT = 0x0100
     assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
@@ -293,6 +307,9 @@ async def test_spi_start_timeout(dut):
 async def test_extract_board_number(dut):
     tb = await normal_start_up_with_no_log(dut)
     tb.dut._log.info("STARTING TEST: test_extract_board_number")
+
+    # Start coverage monitor
+    start_coverage_monitor(dut)
 
     # Test each bit position 
     for i in range(8):
@@ -312,6 +329,9 @@ async def test_extract_board_number(dut):
 async def test_extract_board_num_multiple_bits(dut):
     tb = await normal_start_up_with_no_log(dut)
     tb.dut._log.info("STARTING TEST: test_extract_board_num_multiple_bits")
+
+    # Start coverage monitor
+    start_coverage_monitor(dut)
 
     # Test multiple bits set
     dut.over_thresh.value = 0b00110101
