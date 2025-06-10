@@ -5,7 +5,7 @@ from cocotb.regression import TestFactory
 from cocotb.result import TestFailure
 from cocotb_coverage.coverage import CoverPoint, coverage_db, CoverCross
 
-class hw_manager_base:
+class shim_hw_manager_base:
     """
     Hardware Manager cocotb Base Class
     """
