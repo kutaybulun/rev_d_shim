@@ -227,6 +227,56 @@ async def test_runtime_errors(dut):
         assert dut.trig_en.value == 0, "Expected trigger disabled"
         assert dut.ps_interrupt.value == 1, "Expected interrupt asserted"
 
+# Test per board errors explicitly in RUNNING state, system should go to HALTED state with the error on corresponding board
+# This test will extremely increase simulation time, if you don't care about 100% functional coverage, you can skip this test
+# w/ @cocotb.test(skip=True)
+@cocotb.test()
+async def test_per_board_errors(dut):
+
+    # Start coverage monitor
+    start_coverage_monitor(dut)
+
+    error_conditions = [
+        (dut.shutdown_sense, 0x0300, "STATUS_SHUTDOWN_SENSE"),
+        (dut.over_thresh, 0x0400, "STATUS_OVER_THRESH"),
+        (dut.thresh_underflow, 0x0401, "STATUS_THRESH_UNDERFLOW"),
+        (dut.thresh_overflow, 0x0402, "STATUS_THRESH_OVERFLOW"),
+        (dut.bad_dac_cmd, 0x0600, "STATUS_BAD_DAC_CMD"),
+        (dut.dac_cal_oob, 0x0601, "STATUS_DAC_CAL_OOB"),
+        (dut.dac_val_oob, 0x0602, "STATUS_DAC_VAL_OOB"),
+        (dut.dac_cmd_buf_underflow, 0x0603, "STATUS_DAC_BUF_UNDERFLOW"),
+        (dut.dac_cmd_buf_overflow, 0x0604, "STATUS_DAC_BUF_OVERFLOW"),
+        (dut.unexp_dac_trig, 0x0605, "STATUS_UNEXP_DAC_TRIG"),
+        (dut.bad_adc_cmd, 0x0700, "STATUS_BAD_ADC_CMD"),
+        (dut.adc_cmd_buf_underflow, 0x0701, "STATUS_ADC_BUF_UNDERFLOW"),
+        (dut.adc_cmd_buf_overflow, 0x0702, "STATUS_ADC_BUF_OVERFLOW"),
+        (dut.adc_data_buf_underflow, 0x0703, "STATUS_ADC_DATA_BUF_UNDERFLOW"),
+        (dut.adc_data_buf_overflow, 0x0704, "STATUS_ADC_DATA_BUF_OVERFLOW"),
+        (dut.unexp_adc_trig, 0x0705, "STATUS_UNEXP_ADC_TRIG")
+    ]
+
+    for error_signal, expected_status, status_name in error_conditions:
+        for i in range(8):
+            tb = await normal_start_up_with_no_log(dut)
+            tb.dut._log.info(f"Testing per board error condition: {status_name}")
+
+            # Set the error signal
+            await RisingEdge(dut.clk)
+            error_signal.value = 1 << i
+
+            await RisingEdge(dut.clk) # where the error is detected
+            await RisingEdge(dut.clk) # where the state is updated
+
+            # Check that we are in HALTED state
+            await tb.check_state_and_status(8, expected_status, expected_board_num=i)
+
+            assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
+            assert dut.shutdown_sense_en.value == 0, "Expected shutdown sense disabled"
+            assert dut.spi_clk_power_n == 1, "Expected SPI clock power disabled"
+            assert dut.spi_en.value == 0, "Expected SPI disabled"
+            assert dut.trig_en.value == 0, "Expected trigger disabled"
+            assert dut.ps_interrupt.value == 1, "Expected interrupt asserted"
+
 # Test SPI init timeout, the system should go to HALTED state
 @cocotb.test()
 async def test_spi_init_timeout(dut):
@@ -341,4 +391,53 @@ async def test_extract_board_num_multiple_bits(dut):
     await tb.check_state(8)
     assert dut.board_num.value == 0, f"Board number should be 0 (lowest bit), got {dut.board_num.value}"
 
+# Test runtime errors race conditions in RUNNING state, to see which error is picked up first
+@cocotb.test()
+async def test_runtime_error_race_condition(dut):
+    tb = await normal_start_up_with_no_log(dut)
+    tb.dut._log.info("STARTING TEST: test_runtime_error_race_condition")
+    tb.dut._log.info("Expecting shutdown sense to be picked up first")
+
+    # Start coverage monitor
+    start_coverage_monitor(dut)
+
+    # All error signals under the shutdown sense in the else if tree
+    await RisingEdge(dut.clk)
+    await Timer(tb.clk_period / 4, units=tb.time_unit)
+    dut.ext_shutdown.value = 1
+    dut.over_thresh.value = 1
+    dut.thresh_underflow.value = 1
+    dut.thresh_overflow.value = 1
+    dut.bad_trig_cmd.value = 1
+    dut.trig_buf_overflow.value = 1
+    dut.bad_dac_cmd.value = 1
+    dut.dac_cal_oob.value = 1
+    dut.dac_cmd_buf_underflow.value = 1
+    dut.dac_cmd_buf_overflow.value = 1
+    dut.unexp_dac_trig.value = 1
+    dut.bad_adc_cmd.value = 1
+    dut.adc_cmd_buf_underflow.value = 1
+    dut.adc_cmd_buf_overflow.value = 1
+    dut.adc_data_buf_underflow.value = 1
+    dut.adc_data_buf_overflow.value = 1
+    dut.unexp_adc_trig.value = 1
+
+    # Another error signal slightly later but within the same clock cycle
+    await Timer(tb.clk_period / 4, units=tb.time_unit)
+    dut.dac_val_oob.value = 1
+
+    # Error we expect to be picked up first
+    await Timer(tb.clk_period / 4, units=tb.time_unit)
+    dut.shutdown_sense.value = 1
+
+    # Let the system process the error signals
+    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)   
+
+    # Check that the system is in HALTED state and has the status shutdown sense
+    await tb.check_state_and_status(8, 0x0300)
+    status_info = tb.extract_state_and_status()
+    tb.dut._log.info(f"Got state: {status_info['state_name']}")
+    tb.dut._log.info(f"Got status: {status_info['status_name']}")
+    
     
