@@ -69,19 +69,21 @@ The `shim_hw_manager` module manages the hardware system's startup, operation, a
 ## Operation
 
 ### State Machine Overview
+### State Machine Overview
 
-- **IDLE**: Waits for `sys_en` to go high. Checks for out-of-bounds configuration values. If any OOB condition is detected, transitions to HALTED with the corresponding status code and asserts `ps_interrupt`. If all checks pass, locks configuration and powers up the SPI clock.
-- **CONFIRM_SPI_INIT**: Waits for the SPI subsystem to be powered off (`spi_off`). If not powered off within `SPI_INIT_WAIT`, transitions to HALTED with a timeout status.
-- **RELEASE_SD_F**: Releases shutdown force (`n_shutdown_force` high) and waits for `SHUTDOWN_FORCE_DELAY`.
-- **PULSE_SD_RST**: Pulses `n_shutdown_rst` low for `SHUTDOWN_RESET_PULSE`, then sets it high again.
-- **SD_RST_DELAY**: Waits for `SHUTDOWN_RESET_DELAY` after pulsing shutdown reset, then enables shutdown sense, powers up SPI clock, and enables SPI.
-- **CONFIRM_SPI_START**: Waits for the SPI subsystem to start (`spi_off` deasserted). If not started within `SPI_START_WAIT`, transitions to HALTED with a timeout status. If started, enables triggers and asserts `ps_interrupt`.
-- **RUNNING**: Normal operation. Continuously monitors for halt conditions. If any error or shutdown condition occurs, transitions to HALTED, disables outputs, and asserts `ps_interrupt`.
-- **HALTED**: Waits for `sys_en` to go low, then returns to IDLE and clears status.
+The state machine states are encoded as follows:
+- `4'd1`: `S_IDLE` - Waits for `sys_en` to go high. Checks for out-of-bounds configuration values. If any OOB condition is detected, transitions to `S_HALTED` with the corresponding status code and asserts `ps_interrupt`. If all checks pass, locks configuration and powers up the SPI clock.
+- `4'd2`: `S_CONFIRM_SPI_INIT` - Waits for the SPI subsystem to be powered off (`spi_off`). If not powered off within `SPI_INIT_WAIT`, transitions to `S_HALTED` with a timeout status.
+- `4'd3`: `S_RELEASE_SD_F` - Releases shutdown force (`n_shutdown_force` high) and waits for `SHUTDOWN_FORCE_DELAY`.
+- `4'd4`: `S_PULSE_SD_RST` - Pulses `n_shutdown_rst` low for `SHUTDOWN_RESET_PULSE`, then sets it high again.
+- `4'd5`: `S_SD_RST_DELAY` - Waits for `SHUTDOWN_RESET_DELAY` after pulsing shutdown reset, then enables shutdown sense, powers up SPI clock, and enables SPI.
+- `4'd6`: `S_CONFIRM_SPI_START` - Waits for the SPI subsystem to start (`spi_off` deasserted). If not started within `SPI_START_WAIT`, transitions to `S_HALTED` with a timeout status. If started, enables triggers and asserts `ps_interrupt`.
+- `4'd7`: `S_RUNNING` - Normal operation. Continuously monitors for halt conditions. If any error or shutdown condition occurs, transitions to `S_HALTED`, disables outputs, and asserts `ps_interrupt`.
+- `4'd8`: `S_HALTED` - Waits for `sys_en` to go low, then returns to `S_IDLE` and clears status.
 
 ### Halt/Error Conditions
 
-The system transitions to HALTED and sets the appropriate status code if any of the following occur:
+The system transitions to S_HALTED and sets the appropriate status code if any of the following occur:
 - `sys_en` goes low (processing system shutdown)
 - Configuration lock violation (`lock_viol`)
 - Shutdown detected via `shutdown_sense` or `ext_shutdown`
@@ -103,34 +105,34 @@ The 32-bit `status_word` is formatted as:
 ### Status Codes
 Status codes are 25 bits wide and include:
 
-- `0x00001`: `STATUS_OK` - System is operating normally.
-- `0x00002`: `STATUS_PS_SHUTDOWN` - Processing system shutdown.
-- `0x00100`: `STATUS_SPI_START_TIMEOUT` - SPI start timeout.
-- `0x00101`: `STATUS_SPI_INIT_TIMEOUT` - SPI initialization timeout.
-- `0x00200`: `STATUS_INTEG_THRESH_AVG_OOB` - Integrator threshold average out of bounds.
-- `0x00201`: `STATUS_INTEG_WINDOW_OOB` - Integrator window out of bounds.
-- `0x00202`: `STATUS_INTEG_EN_OOB` - Integrator enable register out of bounds.
-- `0x00203`: `STATUS_SYS_EN_OOB` - System enable register out of bounds.
-- `0x00204`: `STATUS_LOCK_VIOL` - Configuration lock violation.
-- `0x00300`: `STATUS_SHUTDOWN_SENSE` - Shutdown sense detected.
-- `0x00301`: `STATUS_EXT_SHUTDOWN` - External shutdown triggered.
-- `0x00400`: `STATUS_OVER_THRESH` - DAC over threshold.
-- `0x00401`: `STATUS_THRESH_UNDERFLOW` - DAC threshold FIFO underflow.
-- `0x00402`: `STATUS_THRESH_OVERFLOW` - DAC threshold FIFO overflow.
-- `0x00500`: `STATUS_BAD_TRIG_CMD` - Bad trigger command.
-- `0x00501`: `STATUS_TRIG_BUF_OVERFLOW` - Trigger buffer overflow.
-- `0x00600`: `STATUS_BAD_DAC_CMD` - Bad DAC command.
-- `0x00601`: `STATUS_DAC_CAL_OOB` - DAC calibration out of bounds.
-- `0x00602`: `STATUS_DAC_VAL_OOB` - DAC value out of bounds.
-- `0x00603`: `STATUS_DAC_BUF_UNDERFLOW` - DAC command buffer underflow.
-- `0x00604`: `STATUS_DAC_BUF_OVERFLOW` - DAC command buffer overflow.
-- `0x00605`: `STATUS_UNEXP_DAC_TRIG` - Unexpected DAC trigger.
-- `0x00700`: `STATUS_BAD_ADC_CMD` - Bad ADC command.
-- `0x00701`: `STATUS_ADC_BUF_UNDERFLOW` - ADC command buffer underflow.
-- `0x00702`: `STATUS_ADC_BUF_OVERFLOW` - ADC command buffer overflow.
-- `0x00703`: `STATUS_ADC_DATA_BUF_UNDERFLOW` - ADC data buffer underflow.
-- `0x00704`: `STATUS_ADC_DATA_BUF_OVERFLOW` - ADC data buffer overflow.
-- `0x00705`: `STATUS_UNEXP_ADC_TRIG` - Unexpected ADC trigger.
+- `25'h0001`: `STS_OK` - System is operating normally.
+- `25'h0002`: `STS_PS_SHUTDOWN` - Processing system shutdown.
+- `25'h0100`: `STS_SPI_START_TIMEOUT` - SPI start timeout.
+- `25'h0101`: `STS_SPI_INIT_TIMEOUT` - SPI initialization timeout.
+- `25'h0200`: `STS_INTEG_THRESH_AVG_OOB` - Integrator threshold average out of bounds.
+- `25'h0201`: `STS_INTEG_WINDOW_OOB` - Integrator window out of bounds.
+- `25'h0202`: `STS_INTEG_EN_OOB` - Integrator enable register out of bounds.
+- `25'h0203`: `STS_SYS_EN_OOB` - System enable register out of bounds.
+- `25'h0204`: `STS_LOCK_VIOL` - Configuration lock violation.
+- `25'h0300`: `STS_SHUTDOWN_SENSE` - Shutdown sense detected.
+- `25'h0301`: `STS_EXT_SHUTDOWN` - External shutdown triggered.
+- `25'h0400`: `STS_OVER_THRESH` - DAC over threshold.
+- `25'h0401`: `STS_THRESH_UNDERFLOW` - DAC threshold FIFO underflow.
+- `25'h0402`: `STS_THRESH_OVERFLOW` - DAC threshold FIFO overflow.
+- `25'h0500`: `STS_BAD_TRIG_CMD` - Bad trigger command.
+- `25'h0501`: `STS_TRIG_BUF_OVERFLOW` - Trigger buffer overflow.
+- `25'h0600`: `STS_BAD_DAC_CMD` - Bad DAC command.
+- `25'h0601`: `STS_DAC_CAL_OOB` - DAC calibration out of bounds.
+- `25'h0602`: `STS_DAC_VAL_OOB` - DAC value out of bounds.
+- `25'h0603`: `STS_DAC_BUF_UNDERFLOW` - DAC command buffer underflow.
+- `25'h0604`: `STS_DAC_BUF_OVERFLOW` - DAC command buffer overflow.
+- `25'h0605`: `STS_UNEXP_DAC_TRIG` - Unexpected DAC trigger.
+- `25'h0700`: `STS_BAD_ADC_CMD` - Bad ADC command.
+- `25'h0701`: `STS_ADC_BUF_UNDERFLOW` - ADC command buffer underflow.
+- `25'h0702`: `STS_ADC_BUF_OVERFLOW` - ADC command buffer overflow.
+- `25'h0703`: `STS_ADC_DATA_BUF_UNDERFLOW` - ADC data buffer underflow.
+- `25'h0704`: `STS_ADC_DATA_BUF_OVERFLOW` - ADC data buffer overflow.
+- `25'h0705`: `STS_UNEXP_ADC_TRIG` - Unexpected ADC trigger.
 
 ## Board Number Extraction
 

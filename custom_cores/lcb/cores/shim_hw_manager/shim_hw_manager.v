@@ -68,58 +68,58 @@ module shim_hw_manager #(
   assign status_word = {board_num, status_code, state};
 
   // State encoding
-  localparam  IDLE              = 4'd1,
-              CONFIRM_SPI_INIT  = 4'd2,
-              RELEASE_SD_F      = 4'd3,
-              PULSE_SD_RST      = 4'd4,
-              SD_RST_DELAY      = 4'd5,
-              CONFIRM_SPI_START = 4'd6,
-              RUNNING           = 4'd7,
-              HALTED            = 4'd8;
+  localparam  S_IDLE              = 4'd1,
+              S_CONFIRM_SPI_INIT  = 4'd2,
+              S_RELEASE_SD_F      = 4'd3,
+              S_PULSE_SD_RST      = 4'd4,
+              S_SD_RST_DELAY      = 4'd5,
+              S_CONFIRM_SPI_START = 4'd6,
+              S_RUNNING           = 4'd7,
+              S_HALTED            = 4'd8;
 
   //// Status codes
   // Basic system
-  localparam  STATUS_EMPTY                  = 25'h0000,
-              STATUS_OK                     = 25'h0001,
-              STATUS_PS_SHUTDOWN            = 25'h0002;
+  localparam  STS_EMPTY                  = 25'h0000,
+              STS_OK                     = 25'h0001,
+              STS_PS_SHUTDOWN            = 25'h0002;
   // SPI subsystem
-  localparam  STATUS_SPI_START_TIMEOUT      = 25'h0100,
-              STATUS_SPI_INIT_TIMEOUT       = 25'h0101;
+  localparam  STS_SPI_START_TIMEOUT      = 25'h0100,
+              STS_SPI_INIT_TIMEOUT       = 25'h0101;
   // Pre-start configuration values
-  localparam  STATUS_INTEG_THRESH_AVG_OOB   = 25'h0200,
-              STATUS_INTEG_WINDOW_OOB       = 25'h0201,
-              STATUS_INTEG_EN_OOB           = 25'h0202,
-              STATUS_SYS_EN_OOB             = 25'h0203,
-              STATUS_LOCK_VIOL              = 25'h0204;
+  localparam  STS_INTEG_THRESH_AVG_OOB   = 25'h0200,
+              STS_INTEG_WINDOW_OOB       = 25'h0201,
+              STS_INTEG_EN_OOB           = 25'h0202,
+              STS_SYS_EN_OOB             = 25'h0203,
+              STS_LOCK_VIOL              = 25'h0204;
   // Shutdown sense
-  localparam  STATUS_SHUTDOWN_SENSE         = 25'h0300,
-              STATUS_EXT_SHUTDOWN           = 25'h0301;
+  localparam  STS_SHUTDOWN_SENSE         = 25'h0300,
+              STS_EXT_SHUTDOWN           = 25'h0301;
   // Integrator threshold core
-  localparam  STATUS_OVER_THRESH            = 25'h0400,
-              STATUS_THRESH_UNDERFLOW       = 25'h0401,
-              STATUS_THRESH_OVERFLOW        = 25'h0402;
+  localparam  STS_OVER_THRESH            = 25'h0400,
+              STS_THRESH_UNDERFLOW       = 25'h0401,
+              STS_THRESH_OVERFLOW        = 25'h0402;
   // Trigger buffer and commands
-  localparam  STATUS_BAD_TRIG_CMD           = 25'h0500,
-              STATUS_TRIG_BUF_OVERFLOW      = 25'h0501;
+  localparam  STS_BAD_TRIG_CMD           = 25'h0500,
+              STS_TRIG_BUF_OVERFLOW      = 25'h0501;
   // DAC buffers and commands
-  localparam  STATUS_BAD_DAC_CMD            = 25'h0600,
-              STATUS_DAC_CAL_OOB            = 25'h0601,
-              STATUS_DAC_VAL_OOB            = 25'h0602,
-              STATUS_DAC_BUF_UNDERFLOW      = 25'h0603,
-              STATUS_DAC_BUF_OVERFLOW       = 25'h0604,
-              STATUS_UNEXP_DAC_TRIG         = 25'h0605;
+  localparam  STS_BAD_DAC_CMD            = 25'h0600,
+              STS_DAC_CAL_OOB            = 25'h0601,
+              STS_DAC_VAL_OOB            = 25'h0602,
+              STS_DAC_BUF_UNDERFLOW      = 25'h0603,
+              STS_DAC_BUF_OVERFLOW       = 25'h0604,
+              STS_UNEXP_DAC_TRIG         = 25'h0605;
   // ADC buffers and commands
-  localparam  STATUS_BAD_ADC_CMD            = 25'h0700,
-              STATUS_ADC_BUF_UNDERFLOW      = 25'h0701,
-              STATUS_ADC_BUF_OVERFLOW       = 25'h0702,
-              STATUS_ADC_DATA_BUF_UNDERFLOW = 25'h0703,
-              STATUS_ADC_DATA_BUF_OVERFLOW  = 25'h0704,
-              STATUS_UNEXP_ADC_TRIG         = 25'h0705;
+  localparam  STS_BAD_ADC_CMD            = 25'h0700,
+              STS_ADC_BUF_UNDERFLOW      = 25'h0701,
+              STS_ADC_BUF_OVERFLOW       = 25'h0702,
+              STS_ADC_DATA_BUF_UNDERFLOW = 25'h0703,
+              STS_ADC_DATA_BUF_OVERFLOW  = 25'h0704,
+              STS_UNEXP_ADC_TRIG         = 25'h0705;
 
   // Main state machine
   always @(posedge clk) begin
-    if (~aresetn) begin
-      state <= IDLE;
+    if (!aresetn) begin
+      state <= S_IDLE;
       timer <= 0;
       n_shutdown_force <= 0;
       n_shutdown_rst <= 1;
@@ -128,7 +128,7 @@ module shim_hw_manager #(
       spi_clk_power_n <= 1;
       spi_en <= 0;
       trig_en <= 0;
-      status_code <= STATUS_OK;
+      status_code <= STS_OK;
       board_num <= 0;
       ps_interrupt <= 0;
     end else begin
@@ -138,92 +138,92 @@ module shim_hw_manager #(
 
         // Idle state, hardware shut down, waiting for system enable to go high
         // When enabled, lock the config registers and confirm the SPI subsystem is initialized
-        IDLE: begin : idle_state
+        S_IDLE: begin : idle_state
           if (sys_en) begin
             // Check for out of bounds configuration values
             if (integ_thresh_avg_oob) begin // Integrator threshold average out of bounds
-              state <= HALTED;
-              status_code <= STATUS_INTEG_THRESH_AVG_OOB;
+              state <= S_HALTED;
+              status_code <= STS_INTEG_THRESH_AVG_OOB;
               ps_interrupt <= 1;
             end else if (integ_window_oob) begin // Integrator window out of bounds
-              state <= HALTED;
-              status_code <= STATUS_INTEG_WINDOW_OOB;
+              state <= S_HALTED;
+              status_code <= STS_INTEG_WINDOW_OOB;
               ps_interrupt <= 1;
             end else if (integ_en_oob) begin // Integrator enable out of bounds
-              state <= HALTED;
-              status_code <= STATUS_INTEG_EN_OOB;
+              state <= S_HALTED;
+              status_code <= STS_INTEG_EN_OOB;
               ps_interrupt <= 1;
             end else if (sys_en_oob) begin // System enable out of bounds
-              state <= HALTED;
-              status_code <= STATUS_SYS_EN_OOB;
+              state <= S_HALTED;
+              status_code <= STS_SYS_EN_OOB;
               ps_interrupt <= 1;
             end else begin // Lock the cfg registers and start the SPI clock to confirm the SPI subsystem is initialized
-              state <= CONFIRM_SPI_INIT;
+              state <= S_CONFIRM_SPI_INIT;
               timer <= 0;
               unlock_cfg <= 0;
               spi_clk_power_n <= 0;
             end
           end // if (sys_en)
-        end // IDLE
+        end // S_IDLE
 
         // Confirm the SPI subsystem is initialized
         // If the SPI subsystem is not initialized, halt the system
         // Signals to halt:
         //   timer
         //   spi_clk_power_n
-        CONFIRM_SPI_INIT: begin
+        S_CONFIRM_SPI_INIT: begin
           if (timer >= 10 && spi_off) begin
-            state <= RELEASE_SD_F;
+            state <= S_RELEASE_SD_F;
             timer <= 0;
             spi_clk_power_n <= 1;
             n_shutdown_force <= 1;
           end else if (timer >= SPI_INIT_WAIT) begin
-            state <= HALTED;
+            state <= S_HALTED;
             timer <= 0;
             spi_clk_power_n <= 1;
-            status_code <= STATUS_SPI_INIT_TIMEOUT;
+            status_code <= STS_SPI_INIT_TIMEOUT;
             ps_interrupt <= 1;
           end else begin
             timer <= timer + 1;
           end // if (spi_off)
-        end // CONFIRM_SPI_INIT
+        end // S_CONFIRM_SPI_INIT
 
         // Wait for a delay between releasing the shutdown force and pulsing the shutdown reset
         // Signals to halt:
         //   timer
         //   n_shutdown_force
-        RELEASE_SD_F: begin
+        S_RELEASE_SD_F: begin
           if (timer >= SHUTDOWN_FORCE_DELAY) begin
-            state <= PULSE_SD_RST;
+            state <= S_PULSE_SD_RST;
             timer <= 0;
             n_shutdown_rst <= 0;
           end else begin
             timer <= timer + 1;
           end // if (timer >= SHUTDOWN_FORCE_DELAY)
-        end // RELEASE_SD_F
+        end // S_RELEASE_SD_F
 
         // Pulse the shutdown reset for a short time
         // Signals to halt:
         //   timer
         //   n_shutdown_force
         //   n_shutdown_rst
-        PULSE_SD_RST: begin
+        S_PULSE_SD_RST: begin
           if (timer >= SHUTDOWN_RESET_PULSE) begin
-            state <= SD_RST_DELAY;
+            state <= S_SD_RST_DELAY;
             timer <= 0;
             n_shutdown_rst <= 1;
           end else begin
             timer <= timer + 1;
           end // if (timer >= SHUTDOWN_RESET_PULSE)
-        end // PULSE_SD_RST
+        end // S_PULSE_SD_RST
 
         // Wait for a delay after pulsing the shutdown reset before starting the system
         // Signals to halt:
         //   timer
         //   n_shutdown_force
-        SD_RST_DELAY: begin
+        S_SD_RST_DELAY: begin
           if (timer >= SHUTDOWN_RESET_DELAY) begin
-            state <= CONFIRM_SPI_START;
+            state <= S_CONFIRM_SPI_START;
             timer <= 0;
             shutdown_sense_en <= 1;
             spi_clk_power_n <= 0;
@@ -231,7 +231,7 @@ module shim_hw_manager #(
           end else begin
             timer <= timer + 1;
           end // if (timer >= SHUTDOWN_RESET_DELAY)
-        end // SD_RST_DELAY
+        end // S_SD_RST_DELAY
 
 
         // Wait for the SPI subsystem to start before running the system
@@ -243,25 +243,25 @@ module shim_hw_manager #(
         //   spi_clk_power_n
         //   spi_en
         //   trig_en
-        CONFIRM_SPI_START: begin
-          if (~spi_off) begin
-            state <= RUNNING;
+        S_CONFIRM_SPI_START: begin
+          if (!spi_off) begin
+            state <= S_RUNNING;
             timer <= 0;
             trig_en <= 1;
             ps_interrupt <= 1;
           end else if (timer >= SPI_START_WAIT) begin
-            state <= HALTED;
+            state <= S_HALTED;
             timer <= 0;
             n_shutdown_force <= 0;
             shutdown_sense_en <= 0;
             spi_clk_power_n <= 1;
             spi_en <= 0;
-            status_code <= STATUS_SPI_START_TIMEOUT;
+            status_code <= STS_SPI_START_TIMEOUT;
             ps_interrupt <= 1;
           end else begin
             timer <= timer + 1;
-          end // if (~spi_off)
-        end // CONFIRM_SPI_START
+          end // if (!spi_off)
+        end // S_CONFIRM_SPI_START
 
         // Main running state, check for various error conditions or shutdowns
         // Signals to halt:
@@ -270,7 +270,7 @@ module shim_hw_manager #(
         //   spi_clk_power_n
         //   spi_en
         //   trig_en
-        RUNNING: begin
+        S_RUNNING: begin
           // Reset the interrupt if needed
           if (ps_interrupt) begin
             ps_interrupt <= 0;
@@ -309,83 +309,83 @@ module shim_hw_manager #(
           ) begin
             //// Set the status code based on the error condition
             // Basic system
-            if (!sys_en) status_code <= STATUS_PS_SHUTDOWN;
+            if (!sys_en) status_code <= STS_PS_SHUTDOWN;
             // Pre-start configuration values
-            else if (lock_viol) status_code <= STATUS_LOCK_VIOL;
+            else if (lock_viol) status_code <= STS_LOCK_VIOL;
             // Shutdown sense
             else if (shutdown_sense) begin
-              status_code <= STATUS_SHUTDOWN_SENSE;
+              status_code <= STS_SHUTDOWN_SENSE;
               board_num <= extract_board_num(shutdown_sense);
             end
-            else if (ext_shutdown) status_code <= STATUS_EXT_SHUTDOWN;
+            else if (ext_shutdown) status_code <= STS_EXT_SHUTDOWN;
             // Integrator threshold core
             else if (over_thresh) begin
-              status_code <= STATUS_OVER_THRESH;
+              status_code <= STS_OVER_THRESH;
               board_num <= extract_board_num(over_thresh);
             end
             else if (thresh_underflow) begin
-              status_code <= STATUS_THRESH_UNDERFLOW;
+              status_code <= STS_THRESH_UNDERFLOW;
               board_num <= extract_board_num(thresh_underflow);
             end
             else if (thresh_overflow) begin
-              status_code <= STATUS_THRESH_OVERFLOW;
+              status_code <= STS_THRESH_OVERFLOW;
               board_num <= extract_board_num(thresh_overflow);
             end
             // Trigger buffer and commands
-            else if (bad_trig_cmd) status_code <= STATUS_BAD_TRIG_CMD;
-            else if (trig_buf_overflow) status_code <= STATUS_TRIG_BUF_OVERFLOW;
+            else if (bad_trig_cmd) status_code <= STS_BAD_TRIG_CMD;
+            else if (trig_buf_overflow) status_code <= STS_TRIG_BUF_OVERFLOW;
             // DAC buffers and commands
             else if (bad_dac_cmd) begin
-              status_code <= STATUS_BAD_DAC_CMD;
+              status_code <= STS_BAD_DAC_CMD;
               board_num <= extract_board_num(bad_dac_cmd);
             end
             else if (dac_cal_oob) begin
-              status_code <= STATUS_DAC_CAL_OOB;
+              status_code <= STS_DAC_CAL_OOB;
               board_num <= extract_board_num(dac_cal_oob);
             end
             else if (dac_val_oob) begin
-              status_code <= STATUS_DAC_VAL_OOB;
+              status_code <= STS_DAC_VAL_OOB;
               board_num <= extract_board_num(dac_val_oob);
             end
             else if (dac_cmd_buf_underflow) begin
-              status_code <= STATUS_DAC_BUF_UNDERFLOW;
+              status_code <= STS_DAC_BUF_UNDERFLOW;
               board_num <= extract_board_num(dac_cmd_buf_underflow);
             end
             else if (dac_cmd_buf_overflow) begin
-              status_code <= STATUS_DAC_BUF_OVERFLOW;
+              status_code <= STS_DAC_BUF_OVERFLOW;
               board_num <= extract_board_num(dac_cmd_buf_overflow);
             end
             else if (unexp_dac_trig) begin
-              status_code <= STATUS_UNEXP_DAC_TRIG;
+              status_code <= STS_UNEXP_DAC_TRIG;
               board_num <= extract_board_num(unexp_dac_trig);
             end
             // ADC buffers and commands
             else if (bad_adc_cmd) begin
-              status_code <= STATUS_BAD_ADC_CMD;
+              status_code <= STS_BAD_ADC_CMD;
               board_num <= extract_board_num(bad_adc_cmd);
             end
             else if (adc_cmd_buf_underflow) begin
-              status_code <= STATUS_ADC_BUF_UNDERFLOW;
+              status_code <= STS_ADC_BUF_UNDERFLOW;
               board_num <= extract_board_num(adc_cmd_buf_underflow);
             end
             else if (adc_cmd_buf_overflow) begin
-              status_code <= STATUS_ADC_BUF_OVERFLOW;
+              status_code <= STS_ADC_BUF_OVERFLOW;
               board_num <= extract_board_num(adc_cmd_buf_overflow);
             end
             else if (adc_data_buf_underflow) begin
-              status_code <= STATUS_ADC_DATA_BUF_UNDERFLOW;
+              status_code <= STS_ADC_DATA_BUF_UNDERFLOW;
               board_num <= extract_board_num(adc_data_buf_underflow);
             end
             else if (adc_data_buf_overflow) begin
-              status_code <= STATUS_ADC_DATA_BUF_OVERFLOW;
+              status_code <= STS_ADC_DATA_BUF_OVERFLOW;
               board_num <= extract_board_num(adc_data_buf_overflow);
             end
             else if (unexp_adc_trig) begin
-              status_code <= STATUS_UNEXP_ADC_TRIG;
+              status_code <= STS_UNEXP_ADC_TRIG;
               board_num <= extract_board_num(unexp_adc_trig);
             end
             // Set the status code and halt the system
-            state <= HALTED;
+            state <= S_HALTED;
             n_shutdown_force <= 0;
             shutdown_sense_en <= 0;
             spi_clk_power_n <= 1;
@@ -393,22 +393,22 @@ module shim_hw_manager #(
             trig_en <= 0;
             ps_interrupt <= 1;
           end // Error/halt state check
-        end // RUNNING
+        end // S_RUNNING
 
         // Wait in the halted state until the system enable goes low
-        HALTED: begin
+        S_HALTED: begin
           // Reset the interrupt if needed
           if (ps_interrupt) begin
             ps_interrupt <= 0;
           end // if (ps_interrupt)
-          // If the system enable goes low, go to IDLE and clear the status code
-          if (~sys_en) begin 
-            state <= IDLE;
-            status_code <= STATUS_OK;
+          // If the system enable goes low, go to S_IDLE and clear the status code
+          if (!sys_en) begin 
+            state <= S_IDLE;
+            status_code <= STS_OK;
             board_num <= 0;
             unlock_cfg <= 1;
           end
-        end // HALTED
+        end // S_HALTED
 
       endcase // case (state)
     end // if (rst) else
