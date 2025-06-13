@@ -21,12 +21,12 @@ module shim_trigger_core #(
   output reg         bad_cmd
 );
   // Command encoding
-  localparam CMD_CANCEL          = 3'd1;
-  localparam CMD_SYNC_CH         = 3'd2;
-  localparam CMD_SET_LOCKOUT     = 3'd3;
-  localparam CMD_EXPECT_EXT_TRIG = 3'd4;
-  localparam CMD_DELAY           = 3'd5;
-  localparam CMD_FORCE_TRIG      = 3'd6;
+  localparam CMD_SYNC_CH         = 3'd1;
+  localparam CMD_SET_LOCKOUT     = 3'd2;
+  localparam CMD_EXPECT_EXT_TRIG = 3'd3;
+  localparam CMD_DELAY           = 3'd4;
+  localparam CMD_FORCE_TRIG      = 3'd5;
+  localparam CMD_CANCEL          = 3'd7;
 
   // State encoding
   localparam S_IDLE        = 3'd1;
