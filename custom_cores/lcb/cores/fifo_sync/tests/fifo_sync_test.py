@@ -3,6 +3,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly, ReadWrite
 import random
 from fifo_sync_base import fifo_sync_base
+from fifo_sync_coverage import start_coverage_monitor
 
 # Create a setup function that can be called by each test
 async def setup_testbench(dut):
@@ -13,6 +14,7 @@ async def setup_testbench(dut):
 @cocotb.test()
 async def test_fifo_sync_reset(dut):
     tb = await setup_testbench(dut)
+    start_coverage_monitor(dut)  # Start coverage monitoring
     tb.dut._log.info("STARTING TEST: FIFO Synchronous Reset")
 
     # Perform reset
@@ -29,6 +31,7 @@ async def test_fifo_sync_reset(dut):
 @cocotb.test()
 async def test_basic_write_read(dut):
     tb = await setup_testbench(dut)
+    start_coverage_monitor(dut)  # Start coverage monitoring
     await tb.reset()
     tb.dut._log.info("STARTING TEST: Basic Write/Read Operation")
     
@@ -49,6 +52,7 @@ async def test_basic_write_read(dut):
 @cocotb.test()
 async def back_to_back_read_after_write(dut):
     tb = await setup_testbench(dut)
+    start_coverage_monitor(dut)  # Start coverage monitoring
     await tb.reset()
     tb.dut._log.info("STARTING TEST: Back-to-Back Read After Write")
     
@@ -86,6 +90,7 @@ async def back_to_back_read_after_write(dut):
 @cocotb.test()
 async def test_fwft_behavior(dut):
     tb = await setup_testbench(dut)
+    start_coverage_monitor(dut)  # Start coverage monitoring
     await tb.reset()
     tb.dut._log.info("STARTING TEST: First Word Fall Through (FWFT) Behavior")
     
@@ -122,6 +127,7 @@ async def test_fwft_behavior(dut):
 @cocotb.test()
 async def test_full_and_empty_conditions(dut):
     tb = await setup_testbench(dut)
+    start_coverage_monitor(dut)  # Start coverage monitoring
     await tb.reset()
     tb.dut._log.info("STARTING TEST: Full and Empty Conditions")
     
@@ -180,6 +186,7 @@ async def test_almost_full_empty_conditions(dut):
 @cocotb.test()
 async def test_random_simultaneous_read_write(dut):
     tb = await setup_testbench(dut)
+    start_coverage_monitor(dut)  # Start coverage monitoring
 
     # Random test setup
     iterations = 20
@@ -226,6 +233,7 @@ async def test_random_simultaneous_read_write(dut):
 @cocotb.test()
 async def test_random_simultaneous_read_write_w_one_initial_data(dut):
     tb = await setup_testbench(dut)
+    start_coverage_monitor(dut)  # Start coverage monitoring
 
     # Random test setup
     iterations = 20
