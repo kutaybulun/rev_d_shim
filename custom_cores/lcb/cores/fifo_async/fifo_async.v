@@ -1,5 +1,5 @@
 // Thanks to Thomas Witzel, H. Fatih Uǧurdaǧ, and Kutay Bulun :)
-module fifo_asynch_count #(
+module fifo_async #(
     parameter DATA_WIDTH = 16,
     parameter ADDR_WIDTH = 4,  // FIFO depth = 2^ADDR_WIDTH
     parameter ALMOST_FULL_THRESHOLD = 2, // Adjust as needed

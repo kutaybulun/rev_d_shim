@@ -12,6 +12,8 @@ module fifo_sync #(
     output wire                   full,
     output wire                   almost_full,
 
+    output wire [ADDR_WIDTH:0]    fifo_count,
+
     output wire [DATA_WIDTH-1:0]  rd_data,
     input  wire                   rd_en,
     output wire                   empty,
@@ -63,7 +65,6 @@ module fifo_sync #(
     assign empty = (wr_ptr_bin == rd_ptr_bin);
 
     // FIFO count
-    wire [ADDR_WIDTH:0] fifo_count;
     assign fifo_count = wr_ptr_bin - rd_ptr_bin;
 
     // Almost full/empty
