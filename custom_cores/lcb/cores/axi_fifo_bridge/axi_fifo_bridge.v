@@ -36,7 +36,11 @@ module axi_fifo_bridge #(
   // FIFO read side
   input  wire [AXI_DATA_WIDTH-1:0]  fifo_rd_data,
   output wire                       fifo_rd_en,
-  input  wire                       fifo_empty
+  input  wire                       fifo_empty,
+
+  // Underflow/overflow signals for the AXI side
+  output wire                       fifo_underflow,
+  output wire                       fifo_overflow
 );
 
   // Response signals
@@ -58,6 +62,7 @@ module axi_fifo_bridge #(
     if (!aresetn) begin
       s_axi_bvalid <= 1'b0;
       s_axi_bresp  <= 2'b00;
+      fifo_overflow <= 1'b0; // Reset overflow flag on reset
     end else begin
       if (fifo_wr_en) begin
         s_axi_bvalid <= 1'b1;
@@ -65,6 +70,7 @@ module axi_fifo_bridge #(
       end else if (try_write && !write_allowed) begin
         s_axi_bvalid <= 1'b1;
         s_axi_bresp  <= RESP_SLVERR;
+        if (fifo_full) fifo_overflow <= 1'b1; // Indicate overflow if FIFO was trying to write when full
       end else if (s_axi_bready && s_axi_bvalid) begin
         s_axi_bvalid <= 1'b0;
       end
@@ -84,6 +90,7 @@ module axi_fifo_bridge #(
       s_axi_rvalid <= 1'b0;
       s_axi_rresp  <= 2'b00;
       s_axi_rdata  <= {AXI_DATA_WIDTH{1'b0}};
+      fifo_underflow <= 1'b0; // Reset underflow flag on reset
     end else begin
       if (fifo_rd_en) begin
         s_axi_rvalid <= 1'b1;
@@ -93,6 +100,7 @@ module axi_fifo_bridge #(
         s_axi_rvalid <= 1'b1;
         s_axi_rdata  <= {AXI_DATA_WIDTH{1'b0}}; // Return zero data on error
         s_axi_rresp  <= RESP_SLVERR;
+        if (fifo_empty) fifo_underflow <= 1'b1; // Indicate underflow if FIFO was trying to read when empty
       end else if (s_axi_rready && s_axi_rvalid) begin
         s_axi_rvalid <= 1'b0;
       end

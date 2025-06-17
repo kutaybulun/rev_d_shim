@@ -1,7 +1,7 @@
 # SPI System Status Synchronization Core
-*Updated 2025-06-04*
+*Updated 2025-06-17*
 
-The `shim_spi_sts_sync` module synchronizes status signals from the SPI domain to the AXI (PS) clock domain.
+The `shim_spi_sts_sync` module synchronizes status signals from the SPI domain to the AXI (PS) clock domain, ensuring reliable transfer of asynchronous status information.
 
 ## Inputs and Outputs
 
@@ -16,6 +16,8 @@ The `shim_spi_sts_sync` module synchronizes status signals from the SPI domain t
   - `over_thresh [7:0]`: Integrator over-threshold status.
   - `thresh_underflow [7:0]`: Integrator threshold underflow status.
   - `thresh_overflow [7:0]`: Integrator threshold overflow status.
+  - `bad_trig_cmd`: Bad trigger command detected.
+  - `trig_data_buf_overflow`: Trigger data buffer overflow.
   - `bad_dac_cmd [7:0]`: Bad DAC command detected.
   - `dac_cal_oob [7:0]`: DAC calibration out-of-bounds.
   - `dac_val_oob [7:0]`: DAC value out-of-bounds.
@@ -33,6 +35,8 @@ The `shim_spi_sts_sync` module synchronizes status signals from the SPI domain t
   - `over_thresh_stable [7:0]`: Synchronized and stable integrator over-threshold status.
   - `thresh_underflow_stable [7:0]`: Synchronized and stable integrator threshold underflow status.
   - `thresh_overflow_stable [7:0]`: Synchronized and stable integrator threshold overflow status.
+  - `bad_trig_cmd_stable`: Synchronized and stable bad trigger command status.
+  - `trig_data_buf_overflow_stable`: Synchronized and stable trigger data buffer overflow status.
   - `bad_dac_cmd_stable [7:0]`: Synchronized and stable bad DAC command status.
   - `dac_cal_oob_stable [7:0]`: Synchronized and stable DAC calibration out-of-bounds status.
   - `dac_val_oob_stable [7:0]`: Synchronized and stable DAC value out-of-bounds status.
@@ -49,4 +53,3 @@ The `shim_spi_sts_sync` module synchronizes status signals from the SPI domain t
 - For each signal, a stability flag is generated to indicate when the synchronized value is stable.
 - When the stability flag is asserted, the synchronized value is latched into the corresponding stable output register.
 - On AXI domain reset (`aresetn` low), all stable output registers are cleared to their default values (zeros).
-

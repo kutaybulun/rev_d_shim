@@ -1,5 +1,5 @@
 # Hardware Manager Core
-*Updated 2025-06-04*
+*Updated 2025-06-17*
 
 The `shim_hw_manager` module manages the hardware system's startup, operation, and shutdown processes. It implements a state machine to sequence power-up, configuration, SPI subsystem enable, and error/shutdown handling.
 
@@ -33,7 +33,9 @@ The `shim_hw_manager` module manages the hardware system's startup, operation, a
 
 - **Trigger Buffer and Commands**
   - `bad_trig_cmd`: Bad trigger command.
-  - `trig_buf_overflow`: Trigger buffer overflow.
+  - `trig_cmd_buf_overflow`: Trigger command buffer overflow.
+  - `trig_data_buf_underflow`: Trigger data buffer underflow.
+  - `trig_data_buf_overflow`: Trigger data buffer overflow.
 
 - **DAC Buffers and Commands**
   - `bad_dac_cmd [7:0]`: Bad DAC command (per board).
@@ -69,7 +71,6 @@ The `shim_hw_manager` module manages the hardware system's startup, operation, a
 ## Operation
 
 ### State Machine Overview
-### State Machine Overview
 
 The state machine states are encoded as follows:
 - `4'd1`: `S_IDLE` - Waits for `sys_en` to go high. Checks for out-of-bounds configuration values. If any OOB condition is detected, transitions to `S_HALTED` with the corresponding status code and asserts `ps_interrupt`. If all checks pass, locks configuration and powers up the SPI clock.
@@ -89,7 +90,7 @@ The system transitions to S_HALTED and sets the appropriate status code if any o
 - Shutdown detected via `shutdown_sense` or `ext_shutdown`
 - Integrator thresholds exceeded or hardware error underflow/overflow conditions
 - Trigger buffer or command errors
-- DAC/ADC buffer or command errors
+- DAC/ADC buffer or command errors (per board)
 - Unexpected DAC/ADC triggers occur
 - SPI subsystem fails to start or initialize within timeout
 
@@ -103,6 +104,7 @@ The 32-bit `status_word` is formatted as:
 ```
 
 ### Status Codes
+
 Status codes are 25 bits wide and include:
 
 - `25'h0001`: `STS_OK` - System is operating normally.
@@ -120,7 +122,9 @@ Status codes are 25 bits wide and include:
 - `25'h0401`: `STS_THRESH_UNDERFLOW` - DAC threshold FIFO underflow.
 - `25'h0402`: `STS_THRESH_OVERFLOW` - DAC threshold FIFO overflow.
 - `25'h0500`: `STS_BAD_TRIG_CMD` - Bad trigger command.
-- `25'h0501`: `STS_TRIG_BUF_OVERFLOW` - Trigger buffer overflow.
+- `25'h0501`: `STS_TRIG_CMD_BUF_OVERFLOW` - Trigger command buffer overflow.
+- `25'h0502`: `STS_TRIG_DATA_BUF_UNDERFLOW` - Trigger data buffer underflow.
+- `25'h0503`: `STS_TRIG_DATA_BUF_OVERFLOW` - Trigger data buffer overflow.
 - `25'h0600`: `STS_BAD_DAC_CMD` - Bad DAC command.
 - `25'h0601`: `STS_DAC_CAL_OOB` - DAC calibration out of bounds.
 - `25'h0602`: `STS_DAC_VAL_OOB` - DAC value out of bounds.

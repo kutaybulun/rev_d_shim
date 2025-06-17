@@ -29,8 +29,10 @@ module shim_hw_manager #(
   input   wire  [ 7:0]  thresh_underflow, // DAC threshold core FIFO underflow
   input   wire  [ 7:0]  thresh_overflow,  // DAC threshold core FIFO overflow
   // Trigger buffer and commands
-  input   wire          bad_trig_cmd,      // Bad trigger command
-  input   wire          trig_buf_overflow, // Trigger buffer overflow
+  input   wire          bad_trig_cmd,            // Bad trigger command
+  input   wire          trig_cmd_buf_overflow,   // Trigger command buffer overflow
+  input   wire          trig_data_buf_underflow, // Trigger data buffer underflow
+  input   wire          trig_data_buf_overflow,  // Trigger data buffer overflow
   // DAC buffers and commands (per board)
   input   wire  [ 7:0]  bad_dac_cmd,           // Bad DAC command
   input   wire  [ 7:0]  dac_cal_oob,           // DAC calibration out of bounds
@@ -79,42 +81,44 @@ module shim_hw_manager #(
 
   //// Status codes
   // Basic system
-  localparam  STS_EMPTY                  = 25'h0000,
-              STS_OK                     = 25'h0001,
-              STS_PS_SHUTDOWN            = 25'h0002;
+  localparam  STS_EMPTY                   = 25'h0000,
+              STS_OK                      = 25'h0001,
+              STS_PS_SHUTDOWN             = 25'h0002;
   // SPI subsystem
-  localparam  STS_SPI_START_TIMEOUT      = 25'h0100,
-              STS_SPI_INIT_TIMEOUT       = 25'h0101;
+  localparam  STS_SPI_START_TIMEOUT       = 25'h0100,
+              STS_SPI_INIT_TIMEOUT        = 25'h0101;
   // Pre-start configuration values
-  localparam  STS_INTEG_THRESH_AVG_OOB   = 25'h0200,
-              STS_INTEG_WINDOW_OOB       = 25'h0201,
-              STS_INTEG_EN_OOB           = 25'h0202,
-              STS_SYS_EN_OOB             = 25'h0203,
-              STS_LOCK_VIOL              = 25'h0204;
+  localparam  STS_INTEG_THRESH_AVG_OOB    = 25'h0200,
+              STS_INTEG_WINDOW_OOB        = 25'h0201,
+              STS_INTEG_EN_OOB            = 25'h0202,
+              STS_SYS_EN_OOB              = 25'h0203,
+              STS_LOCK_VIOL               = 25'h0204;
   // Shutdown sense
-  localparam  STS_SHUTDOWN_SENSE         = 25'h0300,
-              STS_EXT_SHUTDOWN           = 25'h0301;
+  localparam  STS_SHUTDOWN_SENSE          = 25'h0300,
+              STS_EXT_SHUTDOWN            = 25'h0301;
   // Integrator threshold core
-  localparam  STS_OVER_THRESH            = 25'h0400,
-              STS_THRESH_UNDERFLOW       = 25'h0401,
-              STS_THRESH_OVERFLOW        = 25'h0402;
+  localparam  STS_OVER_THRESH             = 25'h0400,
+              STS_THRESH_UNDERFLOW        = 25'h0401,
+              STS_THRESH_OVERFLOW         = 25'h0402;
   // Trigger buffer and commands
-  localparam  STS_BAD_TRIG_CMD           = 25'h0500,
-              STS_TRIG_BUF_OVERFLOW      = 25'h0501;
+  localparam  STS_BAD_TRIG_CMD            = 25'h0500,
+              STS_TRIG_CMD_BUF_OVERFLOW   = 25'h0501;
+              STS_TRIG_DATA_BUF_UNDERFLOW = 25'h0502,
+              STS_TRIG_DATA_BUF_OVERFLOW  = 25'h0503,
   // DAC buffers and commands
-  localparam  STS_BAD_DAC_CMD            = 25'h0600,
-              STS_DAC_CAL_OOB            = 25'h0601,
-              STS_DAC_VAL_OOB            = 25'h0602,
-              STS_DAC_BUF_UNDERFLOW      = 25'h0603,
-              STS_DAC_BUF_OVERFLOW       = 25'h0604,
-              STS_UNEXP_DAC_TRIG         = 25'h0605;
+  localparam  STS_BAD_DAC_CMD             = 25'h0600,
+              STS_DAC_CAL_OOB             = 25'h0601,
+              STS_DAC_VAL_OOB             = 25'h0602,
+              STS_DAC_BUF_UNDERFLOW       = 25'h0603,
+              STS_DAC_BUF_OVERFLOW        = 25'h0604,
+              STS_UNEXP_DAC_TRIG          = 25'h0605;
   // ADC buffers and commands
-  localparam  STS_BAD_ADC_CMD            = 25'h0700,
-              STS_ADC_BUF_UNDERFLOW      = 25'h0701,
-              STS_ADC_BUF_OVERFLOW       = 25'h0702,
-              STS_ADC_DATA_BUF_UNDERFLOW = 25'h0703,
-              STS_ADC_DATA_BUF_OVERFLOW  = 25'h0704,
-              STS_UNEXP_ADC_TRIG         = 25'h0705;
+  localparam  STS_BAD_ADC_CMD             = 25'h0700,
+              STS_ADC_BUF_UNDERFLOW       = 25'h0701,
+              STS_ADC_BUF_OVERFLOW        = 25'h0702,
+              STS_ADC_DATA_BUF_UNDERFLOW  = 25'h0703,
+              STS_ADC_DATA_BUF_OVERFLOW   = 25'h0704,
+              STS_UNEXP_ADC_TRIG          = 25'h0705;
 
   // Main state machine
   always @(posedge clk) begin
@@ -291,7 +295,9 @@ module shim_hw_manager #(
               || thresh_overflow
               // Trigger buffer and commands
               || bad_trig_cmd
-              || trig_buf_overflow
+              || trig_cmd_buf_overflow
+              || trig_data_buf_underflow
+              || trig_data_buf_overflow
               // DAC buffers and commands
               || bad_dac_cmd
               || dac_cal_oob
@@ -333,7 +339,9 @@ module shim_hw_manager #(
             end
             // Trigger buffer and commands
             else if (bad_trig_cmd) status_code <= STS_BAD_TRIG_CMD;
-            else if (trig_buf_overflow) status_code <= STS_TRIG_BUF_OVERFLOW;
+            else if (trig_cmd_buf_overflow) status_code <= STS_TRIG_CMD_BUF_OVERFLOW;
+            else if (trig_data_buf_underflow) status_code <= STS_TRIG_DATA_BUF_UNDERFLOW;
+            else if (trig_data_buf_overflow) status_code <= STS_TRIG_DATA_BUF_OVERFLOW;
             // DAC buffers and commands
             else if (bad_dac_cmd) begin
               status_code <= STS_BAD_DAC_CMD;

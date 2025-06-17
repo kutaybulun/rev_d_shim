@@ -11,6 +11,12 @@ module shim_trigger_core #(
   input  wire [31:0] cmd_word,
   input  wire        cmd_buf_empty,
 
+  // Data FIFO interface
+  output wire        data_word_wr_en,
+  output wire [31:0] data_buf_wr_data,
+  input  wire        data_buf_full,
+  input  wire        data_buf_almost_full, // Should indicate that the buffer has less than 2 entries free.
+
   // External signals
   input  wire        ext_trigger,
   input  wire [7:0]  dac_waiting_for_trigger,
@@ -18,6 +24,7 @@ module shim_trigger_core #(
 
   // Outputs
   output reg         trigger_out,
+  output reg         data_buf_overflow,
   output reg         bad_cmd
 );
   // Command encoding
@@ -34,6 +41,9 @@ module shim_trigger_core #(
   localparam S_EXPECT_TRIG = 3'd3;
   localparam S_DELAY       = 3'd4;
   localparam S_ERROR       = 3'd5;
+
+  // Trigger lockout minimum
+  localparam TRIGGER_LOCKOUT_MIN = 4;
 
   // State machine info
   reg  [2:0] state;
@@ -55,6 +65,10 @@ module shim_trigger_core #(
   reg [28:0] trig_lockout;
   wire do_trigger;
 
+  // Trigger timing tracking
+  reg [63:0] trigger_timer;
+  reg        trigger_data_second_word;
+
   // Checks for cancel command and synchronization conditions
   assign cancel = !cmd_buf_empty && cmd_type == CMD_CANCEL;
   assign all_waiting = &dac_waiting_for_trigger && &adc_waiting_for_trigger;
@@ -67,7 +81,8 @@ module shim_trigger_core #(
   assign next_cmd = cmd_done && !cmd_buf_empty;
   // Next state from upcoming command
   assign next_cmd_state = cmd_buf_empty ? S_IDLE
-                          : (cmd_type == CMD_CANCEL || cmd_type == CMD_SET_LOCKOUT || cmd_type == CMD_FORCE_TRIG) ? S_IDLE
+                          : (cmd_type == CMD_CANCEL || cmd_type == CMD_FORCE_TRIG) ? S_IDLE
+                          : (cmd_type == CMD_SET_LOCKOUT) ? (cmd_val >= TRIGGER_LOCKOUT_MIN ? S_IDLE : S_ERROR) // Lockout must be non-zero
                           : (cmd_type == CMD_SYNC_CH) ? (all_waiting ? S_IDLE : S_SYNC_CH) // If all channels are already waiting, go right to idle
                           : (cmd_type == CMD_EXPECT_EXT_TRIG) ? ((|cmd_val) ? S_EXPECT_TRIG : S_IDLE) // Zero triggers goes right to idle
                           : (cmd_type == CMD_DELAY) ? ((|cmd_val) ? S_DELAY : S_IDLE) // Zero delay goes right to idle
@@ -82,7 +97,7 @@ module shim_trigger_core #(
   // Set lockout
   always @(posedge clk) begin
     if (!resetn) trig_lockout <= TRIGGER_LOCKOUT_DEFAULT;
-    else if (next_cmd && cmd_type == CMD_SET_LOCKOUT) trig_lockout <= cmd_val;
+    else if (next_cmd && cmd_type == CMD_SET_LOCKOUT && cmd_val >= TRIGGER_LOCKOUT_MIN) trig_lockout <= cmd_val;
   end
   // Expected trigger count
   always @(posedge clk) begin
@@ -113,8 +128,41 @@ module shim_trigger_core #(
     if (!resetn) bad_cmd <= 0;
     else if (next_cmd && next_cmd_state == S_ERROR) bad_cmd <= 1;
   end
+  // Data buffer overflow
+  always @(posedge clk) begin
+    if (!resetn) data_buf_overflow <= 0;
+    else if (do_trigger && (data_buf_full || data_buf_almost_full)) data_buf_overflow <= 1;
+  end
+
 
   //// Read enable
   assign cmd_word_rd_en = next_cmd;
+
+  //// Trigger timing tracking
+  always @(posedge clk) begin
+    if (!resetn) trigger_timer <= 0;
+    else  if (do_trigger) trigger_timer <= 0; // Reset on trigger
+    else if (trigger_timer < 64'hFFFFFFFFFFFFFFFF) trigger_timer <= trigger_timer + 1; // Increment timer without overflow
+  end
+
+  //// Data buffer write logic
+  // Write two sequential 32-bit words to the data buffer each trigger
+  always @(posedge clk) begin
+    if (!resetn) begin
+      data_word_wr_en <= 0;
+      data_buf_wr_data <= 32'h0;
+    end else if (data_word_wr_en) begin // If already writing a word
+      if (trigger_data_second_word) begin
+        data_word_wr_en <= 0; // Disable write after second word
+        trigger_data_second_word <= 0; // Reset second word flag
+      end else begin
+        data_buf_wr_data <= trigger_timer[63:32]; // Second word is the upper 32 bits of the timer
+        trigger_data_second_word <= 1; // Set flag to write second word next cycle
+      end
+    end else if (do_trigger && !data_buf_full && !data_buf_almost_full) begin // Write first word on trigger
+      data_word_wr_en <= 1;
+      data_buf_wr_data <= trigger_timer[31:0]; // First word is the lower 32 bits of the timer
+    end
+  end
 
 endmodule
