@@ -14,6 +14,8 @@ module shim_ads816x_adc_ctrl (
 
   input  wire        trigger,
   output wire        waiting_for_trig,
+
+  output reg         boot_fail,
   output reg         cmd_buf_underflow,
   output reg         data_buf_overflow,
   output reg         unexp_trig,
@@ -210,8 +212,8 @@ module shim_ads816x_adc_ctrl (
     if (!resetn || state == S_ERROR) spi_bit <= 5'd0;
     else if (spi_bit > 0) spi_bit <= spi_bit - 1; // Shift out bits
     else if (write_next_spi_word) begin
-      if (state == S_ADC_RD) spi_bit <= 5'd16; // Start with 16 bits for ADC read
-      else if (state == S_INIT) spi_bit <= 5'd24; // Start with 24 bits for boot-up sequence
+      if (state == S_ADC_RD) spi_bit <= 5'd15; // Start with 16 bits for ADC read
+      else if (state == S_INIT) spi_bit <= 5'd23; // Start with 24 bits for boot-up sequence
     end
   end
   // n_CS signal

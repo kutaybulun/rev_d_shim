@@ -5,7 +5,7 @@ module shim_hw_manager #(
   parameter integer SHUTDOWN_FORCE_DELAY = 25000000, // 100 ms, Delay after releasing "n_shutdown_force" before pulsing "n_shutdown_rst"
   parameter integer SHUTDOWN_RESET_PULSE = 25000,    // 100 us, Pulse width for "n_shutdown_rst"
   parameter integer SHUTDOWN_RESET_DELAY = 25000000, // 100 ms, Delay after pulsing "n_shutdown_rst" before starting the system
-  parameter integer SPI_INIT_WAIT = 25000000,   // 100 ms, Delay after starting the SPI clock before checking if the SPI subsystem is initialized to off
+  parameter integer SPI_RST_WAIT = 25000000,   // 100 ms, Delay after starting the SPI clock before checking if the SPI subsystem is initialized to off
   parameter integer SPI_START_WAIT = 250000000  // 1 second, Delay after starting the SPI clock before halting if the SPI subsystem doesn't start
 )
 (
@@ -34,6 +34,7 @@ module shim_hw_manager #(
   input   wire          trig_data_buf_underflow, // Trigger data buffer underflow
   input   wire          trig_data_buf_overflow,  // Trigger data buffer overflow
   // DAC buffers and commands (per board)
+  input   wire  [ 7:0]  dac_boot_fail,         // DAC boot failure
   input   wire  [ 7:0]  bad_dac_cmd,           // Bad DAC command
   input   wire  [ 7:0]  dac_cal_oob,           // DAC calibration out of bounds
   input   wire  [ 7:0]  dac_val_oob,           // DAC value out of bounds
@@ -41,6 +42,7 @@ module shim_hw_manager #(
   input   wire  [ 7:0]  dac_cmd_buf_overflow,  // DAC command buffer overflow
   input   wire  [ 7:0]  unexp_dac_trig,        // Unexpected DAC trigger
   // ADC buffers and commands (per board)
+  input   wire  [ 7:0]  adc_boot_fail,          // ADC boot failure
   input   wire  [ 7:0]  bad_adc_cmd,            // Bad ADC command
   input   wire  [ 7:0]  adc_cmd_buf_underflow,  // ADC command buffer underflow
   input   wire  [ 7:0]  adc_cmd_buf_overflow,   // ADC command buffer overflow
@@ -53,7 +55,7 @@ module shim_hw_manager #(
   output  reg           spi_clk_power_n,   // SPI clock power (negated)
   output  reg           spi_en,            // SPI subsystem enable
   output  reg           shutdown_sense_en, // Shutdown sense enable
-  output  reg           trig_en,           // Trigger enable
+  output  reg           block_buffers,           // Trigger enable
   output  reg           n_shutdown_force,  // Shutdown force (negated)
   output  reg           n_shutdown_rst,    // Shutdown reset (negated)
   output  wire  [31:0]  status_word,       // Status - Status word
@@ -71,7 +73,7 @@ module shim_hw_manager #(
 
   // State encoding
   localparam  S_IDLE              = 4'd1,
-              S_CONFIRM_SPI_INIT  = 4'd2,
+              S_CONFIRM_SPI_RST   = 4'd2,
               S_RELEASE_SD_F      = 4'd3,
               S_PULSE_SD_RST      = 4'd4,
               S_SD_RST_DELAY      = 4'd5,
@@ -106,19 +108,21 @@ module shim_hw_manager #(
               STS_TRIG_DATA_BUF_UNDERFLOW = 25'h0502,
               STS_TRIG_DATA_BUF_OVERFLOW  = 25'h0503;
   // DAC buffers and commands
-  localparam  STS_BAD_DAC_CMD             = 25'h0600,
-              STS_DAC_CAL_OOB             = 25'h0601,
-              STS_DAC_VAL_OOB             = 25'h0602,
-              STS_DAC_BUF_UNDERFLOW       = 25'h0603,
-              STS_DAC_BUF_OVERFLOW        = 25'h0604,
-              STS_UNEXP_DAC_TRIG          = 25'h0605;
+  localparam  STS_DAC_BOOT_FAIL           = 25'h0600,
+              STS_BAD_DAC_CMD             = 25'h0601,
+              STS_DAC_CAL_OOB             = 25'h0602,
+              STS_DAC_VAL_OOB             = 25'h0603,
+              STS_DAC_BUF_UNDERFLOW       = 25'h0604,
+              STS_DAC_BUF_OVERFLOW        = 25'h0605,
+              STS_UNEXP_DAC_TRIG          = 25'h0606;
   // ADC buffers and commands
-  localparam  STS_BAD_ADC_CMD             = 25'h0700,
-              STS_ADC_BUF_UNDERFLOW       = 25'h0701,
-              STS_ADC_BUF_OVERFLOW        = 25'h0702,
-              STS_ADC_DATA_BUF_UNDERFLOW  = 25'h0703,
-              STS_ADC_DATA_BUF_OVERFLOW   = 25'h0704,
-              STS_UNEXP_ADC_TRIG          = 25'h0705;
+  localparam  STS_DAC_BOOT_FAIL           = 25'h0700,
+              STS_BAD_ADC_CMD             = 25'h0701,
+              STS_ADC_CMD_BUF_UNDERFLOW   = 25'h0702,
+              STS_ADC_CMD_BUF_OVERFLOW    = 25'h0703,
+              STS_ADC_DATA_BUF_UNDERFLOW  = 25'h0704,
+              STS_ADC_DATA_BUF_OVERFLOW   = 25'h0705,
+              STS_UNEXP_ADC_TRIG          = 25'h0706;
 
   // Main state machine
   always @(posedge clk) begin
@@ -131,7 +135,7 @@ module shim_hw_manager #(
       unlock_cfg <= 1;
       spi_clk_power_n <= 1;
       spi_en <= 0;
-      trig_en <= 0;
+      block_buffers <= 1;
       status_code <= STS_OK;
       board_num <= 0;
       ps_interrupt <= 0;
@@ -162,7 +166,7 @@ module shim_hw_manager #(
               status_code <= STS_SYS_EN_OOB;
               ps_interrupt <= 1;
             end else begin // Lock the cfg registers and start the SPI clock to confirm the SPI subsystem is initialized
-              state <= S_CONFIRM_SPI_INIT;
+              state <= S_CONFIRM_SPI_RST;
               timer <= 0;
               unlock_cfg <= 0;
               spi_clk_power_n <= 0;
@@ -170,18 +174,18 @@ module shim_hw_manager #(
           end // if (sys_en)
         end // S_IDLE
 
-        // Confirm the SPI subsystem is initialized
-        // If the SPI subsystem is not initialized, halt the system
+        // Confirm the SPI subsystem is reset to its initial state, off
+        // If the SPI subsystem is not reset to off, halt the system
         // Signals to halt:
         //   timer
         //   spi_clk_power_n
-        S_CONFIRM_SPI_INIT: begin
+        S_CONFIRM_SPI_RST: begin
           if (timer >= 10 && spi_off) begin
             state <= S_RELEASE_SD_F;
             timer <= 0;
             spi_clk_power_n <= 1;
             n_shutdown_force <= 1;
-          end else if (timer >= SPI_INIT_WAIT) begin
+          end else if (timer >= SPI_RST_WAIT) begin
             state <= S_HALTED;
             timer <= 0;
             spi_clk_power_n <= 1;
@@ -190,7 +194,7 @@ module shim_hw_manager #(
           end else begin
             timer <= timer + 1;
           end // if (spi_off)
-        end // S_CONFIRM_SPI_INIT
+        end // S_CONFIRM_SPI_RST
 
         // Wait for a delay between releasing the shutdown force and pulsing the shutdown reset
         // Signals to halt:
@@ -206,7 +210,7 @@ module shim_hw_manager #(
           end // if (timer >= SHUTDOWN_FORCE_DELAY)
         end // S_RELEASE_SD_F
 
-        // Pulse the shutdown reset for a short time
+        // Pulse the shutdown reset for a short time to power on the power stage
         // Signals to halt:
         //   timer
         //   n_shutdown_force
@@ -246,21 +250,30 @@ module shim_hw_manager #(
         //   shutdown_sense_en
         //   spi_clk_power_n
         //   spi_en
-        //   trig_en
         S_CONFIRM_SPI_START: begin
           if (!spi_off) begin
             state <= S_RUNNING;
             timer <= 0;
-            trig_en <= 1;
+            block_buffers <= 0;
             ps_interrupt <= 1;
-          end else if (timer >= SPI_START_WAIT) begin
+          end else if (dac_boot_fail || adc_boot_fail || timer >= SPI_START_WAIT) begin
+            // If the SPI subsystem is still off after the wait, or a channel failed to boot, halt the system
             state <= S_HALTED;
             timer <= 0;
             n_shutdown_force <= 0;
             shutdown_sense_en <= 0;
             spi_clk_power_n <= 1;
             spi_en <= 0;
-            status_code <= STS_SPI_START_TIMEOUT;
+            // Set the status code based on the error condition
+            if (dac_boot_fail) begin
+              status_code <= STS_DAC_BOOT_FAIL;
+              board_num <= extract_board_num(dac_boot_fail);
+            end else if (adc_boot_fail) begin
+              status_code <= STS_ADC_BOOT_FAIL;
+              board_num <= extract_board_num(adc_boot_fail);
+            end else begin
+              status_code <= STS_SPI_START_TIMEOUT;
+            end // if (dac_boot_fail)
             ps_interrupt <= 1;
           end else begin
             timer <= timer + 1;
@@ -273,15 +286,12 @@ module shim_hw_manager #(
         //   shutdown_sense_en
         //   spi_clk_power_n
         //   spi_en
-        //   trig_en
+        //   block_buffers
         S_RUNNING: begin
-          // Reset the interrupt if needed
+          // Reset the interrupt before doing anything else
           if (ps_interrupt) begin
             ps_interrupt <= 0;
-          end // if (ps_interrupt)
-
-          // Error/halt state check
-          if (
+          end else if ( // Check for various error conditions or shutdowns
               // Basic system
               !sys_en
               // Pre-start configuration values
@@ -373,11 +383,11 @@ module shim_hw_manager #(
               board_num <= extract_board_num(bad_adc_cmd);
             end
             else if (adc_cmd_buf_underflow) begin
-              status_code <= STS_ADC_BUF_UNDERFLOW;
+              status_code <= STS_ADC_CMD_BUF_UNDERFLOW;
               board_num <= extract_board_num(adc_cmd_buf_underflow);
             end
             else if (adc_cmd_buf_overflow) begin
-              status_code <= STS_ADC_BUF_OVERFLOW;
+              status_code <= STS_ADC_CMD_BUF_OVERFLOW;
               board_num <= extract_board_num(adc_cmd_buf_overflow);
             end
             else if (adc_data_buf_underflow) begin
@@ -398,7 +408,7 @@ module shim_hw_manager #(
             shutdown_sense_en <= 0;
             spi_clk_power_n <= 1;
             spi_en <= 0;
-            trig_en <= 0;
+            block_buffers <= 1;
             ps_interrupt <= 1;
           end // Error/halt state check
         end // S_RUNNING
