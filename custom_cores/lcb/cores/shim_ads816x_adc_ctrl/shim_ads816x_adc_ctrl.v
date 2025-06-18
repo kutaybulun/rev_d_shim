@@ -179,6 +179,9 @@ module shim_ads816x_adc_ctrl (
 
   //// ADC boot-up SPI sequence
   // TODO: Implement boot-up sequence
+  always @(posedge clk) begin
+    if (!resetn) boot_fail <= 1'b0;
+  end
 
 
   //// ADC word sequencing

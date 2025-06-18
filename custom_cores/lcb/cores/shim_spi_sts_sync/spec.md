@@ -1,7 +1,7 @@
 # SPI System Status Synchronization Core
-*Updated 2025-06-17*
+*Updated 2025-06-18*
 
-The `shim_spi_sts_sync` module synchronizes status signals from the SPI domain to the AXI (PS) clock domain, ensuring reliable transfer of asynchronous status information.
+The `shim_spi_sts_sync` module synchronizes a variety of status signals from the SPI domain into the AXI (PS) clock domain, ensuring reliable and glitch-free transfer of asynchronous status information.
 
 ## Inputs and Outputs
 
@@ -18,11 +18,13 @@ The `shim_spi_sts_sync` module synchronizes status signals from the SPI domain t
   - `thresh_overflow [7:0]`: Integrator threshold overflow status.
   - `bad_trig_cmd`: Bad trigger command detected.
   - `trig_data_buf_overflow`: Trigger data buffer overflow.
+  - `dac_boot_fail [7:0]`: DAC boot failure status.
   - `bad_dac_cmd [7:0]`: Bad DAC command detected.
   - `dac_cal_oob [7:0]`: DAC calibration out-of-bounds.
   - `dac_val_oob [7:0]`: DAC value out-of-bounds.
   - `dac_cmd_buf_underflow [7:0]`: DAC command buffer underflow.
   - `unexp_dac_trig [7:0]`: Unexpected DAC trigger.
+  - `adc_boot_fail [7:0]`: ADC boot failure status.
   - `bad_adc_cmd [7:0]`: Bad ADC command detected.
   - `adc_cmd_buf_underflow [7:0]`: ADC command buffer underflow.
   - `adc_data_buf_overflow [7:0]`: ADC data buffer overflow.
@@ -37,11 +39,13 @@ The `shim_spi_sts_sync` module synchronizes status signals from the SPI domain t
   - `thresh_overflow_stable [7:0]`: Synchronized and stable integrator threshold overflow status.
   - `bad_trig_cmd_stable`: Synchronized and stable bad trigger command status.
   - `trig_data_buf_overflow_stable`: Synchronized and stable trigger data buffer overflow status.
+  - `dac_boot_fail_stable [7:0]`: Synchronized and stable DAC boot failure status.
   - `bad_dac_cmd_stable [7:0]`: Synchronized and stable bad DAC command status.
   - `dac_cal_oob_stable [7:0]`: Synchronized and stable DAC calibration out-of-bounds status.
   - `dac_val_oob_stable [7:0]`: Synchronized and stable DAC value out-of-bounds status.
   - `dac_cmd_buf_underflow_stable [7:0]`: Synchronized and stable DAC command buffer underflow status.
   - `unexp_dac_trig_stable [7:0]`: Synchronized and stable unexpected DAC trigger status.
+  - `adc_boot_fail_stable [7:0]`: Synchronized and stable ADC boot failure status.
   - `bad_adc_cmd_stable [7:0]`: Synchronized and stable bad ADC command status.
   - `adc_cmd_buf_underflow_stable [7:0]`: Synchronized and stable ADC command buffer underflow status.
   - `adc_data_buf_overflow_stable [7:0]`: Synchronized and stable ADC data buffer overflow status.

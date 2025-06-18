@@ -244,6 +244,9 @@ module shim_ad5676_dac_ctrl #(
 
   //// DAC boot-up SPI sequence
   // TODO: Implement boot-up sequence
+  always @(posedge clk) begin
+    if (!resetn) boot_fail <= 1'b0; // Reset boot fail on reset
+  end
 
   //// DAC word sequencing
   // DAC channel count status

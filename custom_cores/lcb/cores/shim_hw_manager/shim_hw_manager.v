@@ -74,10 +74,10 @@ module shim_hw_manager #(
   // State encoding
   localparam  S_IDLE              = 4'd1,
               S_CONFIRM_SPI_RST   = 4'd2,
-              S_RELEASE_SD_F      = 4'd3,
-              S_PULSE_SD_RST      = 4'd4,
-              S_SD_RST_DELAY      = 4'd5,
-              S_CONFIRM_SPI_START = 4'd6,
+              S_POWER_ON_CRTL_BRD = 4'd3,
+              S_CONFIRM_SPI_START = 4'd4,
+              S_POWER_ON_AMP_BRD  = 4'd5,
+              S_AMP_POWER_WAIT    = 4'd6,
               S_RUNNING           = 4'd7,
               S_HALTED            = 4'd8;
 
@@ -181,7 +181,7 @@ module shim_hw_manager #(
         //   spi_clk_power_n
         S_CONFIRM_SPI_RST: begin
           if (timer >= 10 && spi_off) begin
-            state <= S_RELEASE_SD_F;
+            state <= S_POWER_ON_CRTL_BRD;
             timer <= 0;
             spi_clk_power_n <= 1;
             n_shutdown_force <= 1;
@@ -196,41 +196,13 @@ module shim_hw_manager #(
           end // if (spi_off)
         end // S_CONFIRM_SPI_RST
 
-        // Wait for a delay between releasing the shutdown force and pulsing the shutdown reset
+        // Wait for a delay between releasing the shutdown force and starting the SPI control subsystem
+        // This allows the DAC/ADC etc. to power up and be ready for SPI communication
         // Signals to halt:
         //   timer
         //   n_shutdown_force
-        S_RELEASE_SD_F: begin
+        S_POWER_ON_CRTL_BRD: begin
           if (timer >= SHUTDOWN_FORCE_DELAY) begin
-            state <= S_PULSE_SD_RST;
-            timer <= 0;
-            n_shutdown_rst <= 0;
-          end else begin
-            timer <= timer + 1;
-          end // if (timer >= SHUTDOWN_FORCE_DELAY)
-        end // S_RELEASE_SD_F
-
-        // Pulse the shutdown reset for a short time to power on the power stage
-        // Signals to halt:
-        //   timer
-        //   n_shutdown_force
-        //   n_shutdown_rst
-        S_PULSE_SD_RST: begin
-          if (timer >= SHUTDOWN_RESET_PULSE) begin
-            state <= S_SD_RST_DELAY;
-            timer <= 0;
-            n_shutdown_rst <= 1;
-          end else begin
-            timer <= timer + 1;
-          end // if (timer >= SHUTDOWN_RESET_PULSE)
-        end // S_PULSE_SD_RST
-
-        // Wait for a delay after pulsing the shutdown reset before starting the system
-        // Signals to halt:
-        //   timer
-        //   n_shutdown_force
-        S_SD_RST_DELAY: begin
-          if (timer >= SHUTDOWN_RESET_DELAY) begin
             state <= S_CONFIRM_SPI_START;
             timer <= 0;
             shutdown_sense_en <= 1;
@@ -238,9 +210,8 @@ module shim_hw_manager #(
             spi_en <= 1;
           end else begin
             timer <= timer + 1;
-          end // if (timer >= SHUTDOWN_RESET_DELAY)
-        end // S_SD_RST_DELAY
-
+          end // if (timer >= SHUTDOWN_FORCE_DELAY)
+        end // S_POWER_ON_CRTL_BRD
 
         // Wait for the SPI subsystem to start before running the system
         // If the SPI subsystem doesn't start in time, halt the system
@@ -252,10 +223,9 @@ module shim_hw_manager #(
         //   spi_en
         S_CONFIRM_SPI_START: begin
           if (!spi_off) begin
-            state <= S_RUNNING;
+            state <= S_POWER_ON_AMP_BRD;
             timer <= 0;
-            block_buffers <= 0;
-            ps_interrupt <= 1;
+            n_shutdown_rst <= 0;
           end else if (dac_boot_fail || adc_boot_fail || timer >= SPI_START_WAIT) begin
             // If the SPI subsystem is still off after the wait, or a channel failed to boot, halt the system
             state <= S_HALTED;
@@ -279,6 +249,43 @@ module shim_hw_manager #(
             timer <= timer + 1;
           end // if (!spi_off)
         end // S_CONFIRM_SPI_START
+
+        // Pulse the shutdown reset for a short time to power on the power stage
+        // Signals to halt:
+        //   timer
+        //   n_shutdown_force
+        //   n_shutdown_rst
+        //   shutdown_sense_en
+        //   spi_clk_power_n
+        //   spi_en
+        S_POWER_ON_AMP_BRD: begin
+          if (timer >= SHUTDOWN_RESET_PULSE) begin
+            state <= S_AMP_POWER_WAIT;
+            timer <= 0;
+            n_shutdown_rst <= 1;
+          end else begin
+            timer <= timer + 1;
+          end // if (timer >= SHUTDOWN_RESET_PULSE)
+        end // S_POWER_ON_AMP_BRD
+
+        // Wait for a delay after pulsing the shutdown reset before starting the system control
+        //   (unblocking command/data buffers)
+        // Signals to halt:
+        //   timer
+        //   n_shutdown_force
+        //   shutdown_sense_en
+        //   spi_clk_power_n
+        //   spi_en
+        S_AMP_POWER_WAIT: begin
+          if (timer >= SHUTDOWN_RESET_DELAY) begin
+            state <= S_RUNNING;
+            timer <= 0;
+            block_buffers <= 0;
+            ps_interrupt <= 1;
+          end else begin
+            timer <= timer + 1;
+          end // if (timer >= SHUTDOWN_RESET_DELAY)
+        end // S_AMP_POWER_WAIT
 
         // Main running state, check for various error conditions or shutdowns
         // Signals to halt:
