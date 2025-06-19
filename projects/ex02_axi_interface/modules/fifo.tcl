@@ -55,7 +55,7 @@ cell lcb:user:fifo_sync fifo {
   empty axi_fifo_bridge/fifo_empty
 }
 
-## Concatenate the FIFO's status signals to the axi_hub's status signals
+## Concatenate the FIFO's status signals to one 32-bit word
 # 18 bit pad to make the status word 32 bits
 cell xilinx.com:ip:xlconstant:1.1 sts_word_padding {
   CONST_VAL 0

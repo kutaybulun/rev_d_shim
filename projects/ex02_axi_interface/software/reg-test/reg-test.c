@@ -9,9 +9,9 @@
 
 #define CMA_ALLOC _IOWR('Z', 0, uint32_t)
 
-#define AXI_HUB_BASE                  0x40000000
-#define AXI_HUB_CFG   AXI_HUB_BASE |  0x00000000
-#define AXI_HUB_STS   AXI_HUB_BASE |  0x01000000
+// Addresses are defined in the hardware design TCL file
+#define AXI_CFG 0x40000000
+#define AXI_STS 0x41000000
 
 void test_write_8(volatile void *cfg, uint32_t offset, uint8_t value) {
   *((uint64_t *)(cfg)) = 0xffffffffffffffff; // pre-set the register
@@ -67,8 +67,8 @@ uint32_t nand_32bit_32bit_write(uint32_t a, uint32_t b, volatile void *cfg, vola
 int main()
 {
   int fd, i; // File descriptor, loop counter
-  volatile void *cfg; // CFG register in AXI hub (set to 64 bits wide)
-  volatile void *sts; // STS register in AXI hub (set to 32 bits wide)
+  volatile void *cfg; // CFG register AXI interface (using the first 64 bits)
+  volatile void *sts; // STS register AXI interface (using the first 32 bits)
 
   // Open /dev/mem to access physical memory
   printf("Opening /dev/mem...\n");
@@ -79,14 +79,13 @@ int main()
   }
 
   // Map CFG and STS registers
-  // The base address of the AXI hub is 0x40000000
-  // Bits 24-26 are used to indicate the target in the hub
-  // 0 is the CFG register and 1 is the STS register
+  // Addresses are defined in the hardware design TCL file
+  // sysconf(_SC_PAGESIZE) is the minimum size to map, as it's the size of a memory page
   printf("Mapping CFG and STS registers...\n");
-  cfg = mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_HUB_CFG);
-  printf("CFG register mapped to %08"PRIx32"\n", AXI_HUB_CFG);
-  sts = mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_HUB_STS);
-  printf("STS register mapped to %08"PRIx32"\n", AXI_HUB_STS);
+  cfg = mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_CFG);
+  printf("CFG register mapped to %08"PRIx32"\n", AXI_CFG);
+  sts = mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_STS);
+  printf("STS register mapped to %08"PRIx32"\n", AXI_STS);
 
   close(fd);
   printf("Mapping complete.\n");

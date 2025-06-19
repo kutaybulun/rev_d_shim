@@ -12,11 +12,11 @@
 
 #define CMA_ALLOC _IOWR('Z', 0, uint32_t)
 
-#define AXI_HUB_BASE    (uint32_t)               0x40000000
-#define AXI_HUB_CFG     (uint32_t) AXI_HUB_BASE + 0x0000000
-#define AXI_HUB_STS     (uint32_t) AXI_HUB_BASE + 0x1000000
-#define AXI_HUB_0_FIFO  (uint32_t) AXI_HUB_BASE + 0x2000000
-#define AXI_HUB_1_BRAM  (uint32_t) AXI_HUB_BASE + 0x3000000
+// Addresses are defined in the hardware design TCL file
+#define AXI_CFG  (uint32_t) 0x40000000
+#define AXI_STS  (uint32_t) 0x41000000
+#define AXI_FIFO (uint32_t) 0x42000000
+#define AXI_BRAM (uint32_t) 0x43000000
 
 #define CFG_SIZE        (uint32_t) 96 / 8 // Size of the configuration register in bytes
 #define STS_SIZE        (uint32_t) 64 / 8 // Size of the status register in bytes
@@ -54,14 +54,14 @@ int main()
 {
   
   //////////////////// 1. Setup ////////////////////
-  printf("Test program for Pavel Demin's AXI hub\n");
+  printf("Test program for AXI FIFO and BRAM interfaces\n");
   printf("Setup:\n");
 
   int fd, i; // File descriptor, loop counter
-  volatile void *cfg; // CFG register in AXI hub (set to 32 bits wide)
-  volatile void *sts; // STS register in AXI hub (set to 32 bits wide)
-  volatile void *fifo; // FIFO register in AXI hub on port 0
-  volatile void *bram; // BRAM register in AXI hub on port 1
+  volatile void *cfg; // CFG register AXI interface
+  volatile void *sts; // STS register AXI interface
+  volatile void *fifo; // FIFO AXI interface
+  volatile void *bram; // BRAM AXI interface
 
   uint32_t pagesize = sysconf(_SC_PAGESIZE); // Get the system page size
   printf("System page size: %d\n", pagesize);
@@ -75,31 +75,28 @@ int main()
   }
 
   // Map CFG and STS registers
-  // The base address of the AXI hub is 0x40000000
-  // Bits 24-26 are used to indicate the target in the hub
-  // 0 is the CFG register and 1 is the STS register
-  // 2-7 are ports 0-5 (n-2)
+  // Addresses are defined in the hardware design TCL file
   printf("Mapping registers and ports...\n");
 
   // CFG register
   uint32_t cfg_page_count = (CFG_SIZE - 1) / pagesize + 1; // Calculate number of pages needed for CFG
-  cfg = mmap(NULL, cfg_page_count * pagesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_HUB_CFG);
-  printf("CFG register mapped to 0x%x:0x%x (%d pages)\n", AXI_HUB_CFG, AXI_HUB_CFG + CFG_SIZE - 1, cfg_page_count);
+  cfg = mmap(NULL, cfg_page_count * pagesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_CFG);
+  printf("CFG register mapped to 0x%x:0x%x (%d pages)\n", AXI_CFG, AXI_CFG + CFG_SIZE - 1, cfg_page_count);
 
   // STS register
   uint32_t sts_page_count = (STS_SIZE - 1) / pagesize + 1; // Calculate number of pages needed for STS
-  sts = mmap(NULL, sts_page_count * pagesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_HUB_STS);
-  printf("STS register mapped to 0x%x:0x%x (%d pages)\n", AXI_HUB_STS, AXI_HUB_STS + STS_SIZE - 1, sts_page_count);
+  sts = mmap(NULL, sts_page_count * pagesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_STS);
+  printf("STS register mapped to 0x%x:0x%x (%d pages)\n", AXI_STS, AXI_STS + STS_SIZE - 1, sts_page_count);
 
   // FIFO on port 0
   // FIFO is only one page because it's a stream
-  fifo = mmap(NULL, pagesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_HUB_0_FIFO);
-  printf("FIFO (port 0) mapped to 0x%x\n", AXI_HUB_0_FIFO);
+  fifo = mmap(NULL, pagesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_FIFO);
+  printf("FIFO (port 0) mapped to 0x%x\n", AXI_FIFO);
 
   // BRAM on port 1
   uint32_t bram_page_count = (BRAM_SIZE - 1) / pagesize + 1; // Calculate number of pages needed for BRAM
-  bram = mmap(NULL, bram_page_count * pagesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_HUB_1_BRAM);
-  printf("BRAM (port 1) mapped to 0x%x:0x%x (%d pages)\n", AXI_HUB_1_BRAM, AXI_HUB_1_BRAM + BRAM_SIZE - 1, bram_page_count);
+  bram = mmap(NULL, bram_page_count * pagesize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_BRAM);
+  printf("BRAM (port 1) mapped to 0x%x:0x%x (%d pages)\n", AXI_BRAM, AXI_BRAM + BRAM_SIZE - 1, bram_page_count);
   
   // File can be closed after mapping without affecting the mapped memory
   close(fd);
@@ -107,13 +104,11 @@ int main()
 
 
 
-  //////////////////// 2. Compatibility with other examples ////////////////////
+  //////////////////// 2. Compatibility with other software examples ////////////////////
 
-  // Compatibile with the code in example_axi_hub_regs/axi_hub_regs.c
-  // CFG bits 63:0 and STS bits 31:0 are used for the NAND example
+  // CFG bits 63:0 and STS bits 31:0 are used for the reg_test NAND example
   cfg = cfg + 8; // Skip the first 8 bytes of the CFG register
   sts = sts + 4; // Skip the first 4 bytes of the STS register
-
 
 
   //////////////////// 3. Main command loop ////////////////////
@@ -138,6 +133,7 @@ int main()
     // FIFO reset command
     } else if(strcmp(token, "freset") == 0) {
       *((volatile uint32_t *)cfg) |=  0b1; // Reset the FIFO
+      usleep(10); // Wait for a short time to ensure the reset is applied
       *((volatile uint32_t *)cfg) &= ~0b1; // Clear the reset
       printf("FIFO reset.\n");
 
@@ -275,6 +271,7 @@ uint32_t is_underflow(volatile void *sts)
 void print_fifo_status(volatile void *sts)
 {
   printf("FIFO Status:\n");
+  printf(" Note: Write and Read counts will be the same for a synchronous FIFO\n");
   printf("  Write Count: %d\n", wr_count(sts));
   printf("  Read Count: %d\n", rd_count(sts));
   printf("  Full: %d\n", is_full(sts));

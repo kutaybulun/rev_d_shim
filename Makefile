@@ -6,10 +6,10 @@
 
 # You need to set PROJECT, BOARD, and BOARD_VERto the project and board you want to build
 # These can be set on the command line:
-# - e.g. 'make PROJECT=example_axi_hub_regs BOARD=snickerdoodle_black BOARD_VER=1.0'
+# - e.g. 'make PROJECT=ex02_axi_interface BOARD=snickerdoodle_black BOARD_VER=1.0'
 
 # Default values for PROJECT and BOARD
-PROJECT ?= example_axi_hub
+PROJECT ?= rev_d_shim
 BOARD ?= snickerdoodle_black
 BOARD_VER ?= 1.0
 OFFLINE ?= false
