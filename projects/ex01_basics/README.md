@@ -1,4 +1,42 @@
-# Example FCLK Control Project
+# Example 01: Basics
+
+Example 01 is a basic first full project that demonstrates the overview of a build project in this repo.
+
+The project introduces the following tools and concepts:
+- Project structure and organization
+- Board files and configuring support for different boards
+- Building a Vivado XPR project file
+- Building a Vivado XSA hardware definition file
+- Building a PetaLinux operating system on a bootable SD card
+- The Makefile and build scripts
+- Automated software inclusion in the PetaLinux image
+- Controlling the FCLK clock through software
+
+## Overview
+
+
+## Software
+
+
+## Tools and Concepts
+
+### Project Structure and Organization
+
+### Building a Vivado XPR Project File
+
+### Building a Vivado XSA Hardware Definition File
+
+### Building a PetaLinux Operating System on a Bootable SD Card
+
+### The Makefile and Build Scripts
+
+### Automated Software Inclusion in the PetaLinux Image
+
+### Controlling the FCLK Clock through Software
+
+
+
+## TODO: Previous text (to be removed)
 
 This project demonstrates how to control the FCLK clock on a Zynq device through software. The project includes a block design that sets up the necessary hardware components and a C code example that demonstrates how to control the FCLK clock.
 

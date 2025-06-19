@@ -1,6 +1,39 @@
-# Example AXI Hub Project
+# Example 02: AXI Interface
 
-This project demonstrates the full use of Pavel Demin's AXI hub core, utilizing the CFG/STS registers and both AXI-Stream and BRAM ports. The AXI hub can support either a BRAM or AXI-Stream interface on each port, where the AXI-Stream can include the Manager, Subordinate, or both. The project instantiates a AXI-Stream FIFO loopback on port 0. The FIFO takes input from the hub port 0 AXI-S Manager, and outputs to the hub port 0 AXI-S Subordinate, allowing read and write on port 0. The project then includes a BRAM interface on port 1 with both read and write access.
+Example 02 is a demonstration of some basic AXI interfaces.
+
+The project introduces the following tools and concepts:
+- TCL scripting for block design creation
+- TCL scripting for submodules
+- Custom block design cores
+- AXI memory interfaces and mapping
+- BRAM block sizes and usage
+- Utilization reports
+
+## Overview
+
+
+## Software
+
+
+## Tools and Concepts
+
+### TCL Scripting for Block Design Creation
+
+### TCL Scripting for Submodules
+
+### Custom Block Design Cores
+
+### AXI Memory Interfaces and Mapping
+
+### BRAM Block Sizes and Usage
+
+### Utilization Reports
+
+
+
+
+## TODO: Previous text (to be removed)
 
 The project also supports simple code demonstrating the use of just the AXI hub's config and status registers. The project implements a NAND gate that takes two 32-bit inputs from the AXI hub's config register and outputs the result to the status register. This is a useful project to demonstrate how to interface with the AXI hub's registers from both the programmable logic (PL) and the processing system (PS) of the Zynq.
 
