@@ -1,5 +1,5 @@
 # Threshold Integrator Core
-*Updated 2025-06-04*
+*Updated 2025-06-20*
 
 The `shim_threshold_integrator` module is a safety core designed for the Rev D shim firmware. It captures the absolute values of DAC and ADC inputs/outputs and maintains a running sum over a user-defined window. If any channel's sum exceeds a user-defined threshold, it sends a fault signal to the system.
 
@@ -15,7 +15,7 @@ The `shim_threshold_integrator` module is a safety core designed for the Rev D s
   - `sample_core_done`: Signal indicating that the DAC/ADC core is ready.
 
 - **Configuration Signals**:
-  - `window`: 32-bit unsigned value defining the integration window size (range: \(2^{11}\) to \(2^{32} - 1\)).
+  - `window`: 32-bit unsigned value defining the integration window size (range: \(2^{11}\) to \(2^{32} - 1\)). Note that this value will be rounded down to the nearest multiple of 16.
   - `threshold_average`: 15-bit unsigned value defining the threshold average (absolute, range: 0 to \(2^{15} - 1\)).
 
 - **Input Data**:
@@ -48,9 +48,9 @@ The `shim_threshold_integrator` module is a safety core designed for the Rev D s
 - **Inflow Logic**:
   - For each channel, captures the absolute value of the input every 16th clock cycle.
   - Aggregates values into a sample sum.
-  - Pushes sample sums into the FIFO when the inflow sample timer resets.
+  - Pushes 8 sample sums (one per channel) into the FIFO when the inflow sample timer resets.
 - **Outflow Logic**:
-  - Pops 8 samples from the FIFO when the outflow timer reaches 16.
+  - Pops 8 samples from the FIFO when the outflow timer reaches 16 (one per channel).
   - Moves queued samples into outflow values and remainders.
   - Updates the running total sum for each channel using the difference between inflow and outflow values.
 - **Threshold Check**:
@@ -61,18 +61,6 @@ The `shim_threshold_integrator` module is a safety core designed for the Rev D s
 
 ## Core Specifications
 
-- **Clock Domain**: System clock.
-- **FIFO**: One 36-bit wide FIFO with a depth of 1024.
-- **Internal Signals**:
-  - 44-bit unsigned `max_value`.
-  - 5-bit `sample_size` and 25-bit `sample_mask`.
-  - Timers for inflow sampling and outflow sampling.
-  - Per channel (8 channels):
-    - 15-bit inflow absolute value.
-    - 36-bit inflow sample sum.
-    - 36-bit queued FIFO in/out sample sums.
-    - 15/16-bit outflow value and 20-bit outflow remainder.
-    - 45-bit running total sum.
 - **Reset Behavior**:
   - All internal signals and outputs are cleared.
   - FIFO is reset.
@@ -81,7 +69,6 @@ The `shim_threshold_integrator` module is a safety core designed for the Rev D s
 ### Notes:
 - The FIFO is used to manage the running sum efficiently, with a depth of 1024 and a width of 36 bits.
 - Sample clustering reduces the required FIFO depth while maintaining precision.
-- The core ensures no drift by including remainders in subsequent calculations.
 - The minimum window size is 2048 to ensure sufficient processing time for FIFO operations.
 
 ### References:
