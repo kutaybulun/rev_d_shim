@@ -1,6 +1,6 @@
 SIM ?= verilator
 TOPLEVEL_LANG ?= verilog
-TEST_DIR := $(shell pwd)/..
+TEST_DIR := $(abspath $(shell pwd)/..)
 
 CORE_NAME := $(notdir $(abspath $(TEST_DIR)/..))
 VERILOG_SOURCES += $(abspath $(TEST_DIR)/../$(CORE_NAME).v)
@@ -9,7 +9,8 @@ VERILOG_SOURCES += $(abspath $(wildcard $(TEST_DIR)/../submodules/*.v))
 $(info --------------------------)
 $(info Core name: $(CORE_NAME))
 $(info Using Verilog sources: $(VERILOG_SOURCES))
-$(info $(TEST_DIR) is the test directory)
+$(info $(TEST_DIR) is the test directory ($$(abspath $$(shell pwd)/..)))
+$(info $(PWD) is the PWD variable (make command location, different from $$(shell pwd)))
 $(info --------------------------)
 
 EXTRA_ARGS += --trace --trace-structs -Wno-fatal --timing 
@@ -18,7 +19,6 @@ ifneq ("$(wildcard parameters.json)","")
 EXTRA_ARGS += $(foreach kv,$(shell jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' parameters.json),-pvalue+$(kv))
 endif
 
-$(info --------------------------)
 $(info Using EXTRA_ARGS: $(EXTRA_ARGS))
 $(info --------------------------)
 
@@ -39,7 +39,7 @@ test_custom_core:
 	mkdir -p $(RESULTS_DIR)
 	COCOTB_RESULTS_FILE=$(COCOTB_RESULTS_FILE) SIM_BUILD=$(SIM_BUILD) \
 		RESULTS_DIR=$(RESULTS_DIR) \
-		$(MAKE) sim MODULE=$(CORE_NAME)_test TOPLEVEL=$(CORE_NAME); \
+		$(MAKE) --directory="$(TEST_DIR)/src" --file="$(realpath $(REV_D_DIR)/scripts/make/cocotb.mk)" sim MODULE=$(CORE_NAME)_test TOPLEVEL=$(CORE_NAME); \
 	RESULT=$$?; \
 	mv dump.vcd $(RESULTS_DIR)/dump.vcd; \
 	if [ $$RESULT -ne 0 ]; then exit $$RESULT; fi
