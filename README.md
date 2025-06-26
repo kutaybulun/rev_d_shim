@@ -15,13 +15,12 @@ This repository contains the source code and documentation for the Revision D Sh
 - [Overview](#overview)
 - [Getting Started](#getting-started)
 - [Building an SD card](#building-an-sd-card)
-- [Using the Rev D Shim Amplifier](#using-the-rev-d-shim-amplifier)
 - [Example Projects](#example-projects)
 - [Testing](#testing)
 
 ## Background -- Zynq 7000 Series
 
-Zynq 7000 SoCs are a series of System on Chip (SoC) devices from AMD/Xilinx that combine an ARM processor with an FPGA. There are  several variants of the Zynq 7000 SoC series, including the Zynq 7010, Zynq 7020, and beyond. Different variants will have different I/O, memory, and processing capabilities, but they all share the same basic architecture, which allows most projects to be ported between them with minimal changes (unless you're at the limit of one of those resources and trying to port to a less-capable variant).
+Zynq 7000 SoCs are a series of System on Chip (SoC) devices from AMD/Xilinx that combine an ARM processor with an FPGA. There are several variants of the Zynq 7000 SoC series, including the Zynq 7010, Zynq 7020, and beyond. Different variants will have different I/O, memory, and processing capabilities, but they all share the same basic architecture, which allows most projects to be ported between them with minimal changes (unless you're at the limit of one of those resources and trying to port to a less-capable variant).
 
 Zynq 7000 SoCs are available on a number of boards, including the Red Pitaya, the Snickerdoodle, Zybo boards, and many others. Different boards will have different Zynq variants -- for instance, the Red Pitaya STEMlab 125-14 uses the smaller Zynq 7010 chip, while the Snickerdoodle Black and Red Pitaya SDRlab 122-16 use the midrange Zynq 7020. In addition, different boards will expose different amounts of the Zynq's available I/O -- for instance, while the Snickerdoodle Black and Red Pitaya SDRlab 122-16 have the same Zynq 7020 chip, the Snickerdoodle Black has significantly more I/O pins accessible. 
 
@@ -29,9 +28,9 @@ This repository is designed to allow compatibility with any board that uses a Zy
 
 ## Repo structure
 
-This repo is structured to allow for easy building of projects. It's primarily a collection of source code, configuration files, and scripts for the tools used -- Vivado and PetaLinux. There are some additional tools for testing, which you can read about in the  [Testing](#testing) section.
+This repo is structured to allow for easy building of projects. It's primarily a collection of source code, configuration files, and scripts for the tools used -- Vivado and PetaLinux. There are some additional tools for testing, which you can read about in the [Testing](#testing) section.
 
-The top-level directory contains the following folders (which each contain their own more in-depth README.md files):
+The top-level directory contains the following folders (which each contain their own more in-depth README files):
 - `boards`: Contains board files for boards that use the Zynq 7000 series SoCs. These files contain information about the board's hardware, like which Zynq variant is used or the I/O pinout. If you want to add support for a new board, you can take their board files (found online) and add a new folder here with the board's name containing the `board_files` folder.
 - `custom_cores`: Contains custom cores used in the scripted build of the FPGA system. These cores are separated by "vendor", basically meaning the original author. For instance, the `pavel_demin` folder contains cores that were originally written by Pavel Demin, while the `open_mri` folder contains cores that were originally written by people in the Open-MRI OCRA project (likely Thomas Witzel). Cores in `lcb` were primarily written by me, Lincoln Craven-Brightman, with contributions from folks like Kutay Bulun, H. Fatih Uǧurdag, and Thomas Witzel. You can add your own custom cores here in your own folder, following the same structure as the others.
 - `kernel_modules`: Contains kernel modules that can be included in the Linux kernel build for projects.
@@ -91,7 +90,7 @@ On the "**Select Product to Install**" page, scroll to the bottom and select "**
 
 Running the unified installer again, back on the "**Select Product to Install**" page, "**Vivado**" should be the second option. Select it and click Next. Under "**Select Edition to Install**", select "**Vivado ML Standard**" and click Next. The next section, "**Vivado ML Standard**", allows you to trim the installation size to only the components needed. First, I recommend unchecking everything you can. You can then check the following options:
 - **DocNav** (optional) for looking at documentation in the Vivado GUI. Documentation can also be found online.
-- Under **Devices** -> **Production Devices** -> **SoCs** check **Zynq-7000**  (you may need to expand the sections to see this. It's fine that it says "limited support").
+- Under **Devices** -> **Production Devices** -> **SoCs** check **Zynq-7000** (you may need to expand the sections to see this. It's fine that it says "limited support").
 
 Click Next. Accept the Licence Agreements and click Next. Just like with PetaLinux, you can leave everything as default under "**Select Destination Directory**" (the default will be `/tools/Xilinx/` and will create a `Vivado/2024.2` directory). Click Next and then Install.
 
@@ -157,7 +156,7 @@ if [[ $- == *i* ]]; then . "$HOME/.bashrc"; fi
 ```
 which checks if the `$-` variable (containing single letter flags about the terminal status) contains `i` (interactive).
 
-All of this gives me the following  `~/.profile`, in its entirety:
+All of this gives me the following `~/.profile`, in its entirety:
 
 ```bash ~/.profile
 # ~/.profile: executed by the command interpreter for login shells.
@@ -174,7 +173,7 @@ All of this gives me the following  `~/.profile`, in its entirety:
 if [ -n "$BASH_VERSION" ]; then
     # include .bashrc if it exists
     if [ -f "$HOME/.bashrc" ]; then
-	if [[ $- == *i* ]]; then . "$HOME/.bashrc"; fi
+        if [[ $- == *i* ]]; then . "$HOME/.bashrc"; fi
     fi
 fi
 
@@ -339,14 +338,85 @@ tar -xzf out/snickerdoodle_black/1.0/rootfs.tar.gz -C [RootFS_mountpoint]
 
 If your board isn't the Snickerdoodle Black, or you want to modify the project or build your own, you should read the [Example Projects](#example-projects) section to get a sense of how everything works.
 
-# Using the Rev D Shim Amplifier
+## Building a different board, board version, or project
 
-TODO
+The Makefile is set up to read variables for `BOARD`, `BOARD_VER`, and `PROJECT` from the command line. These can be used to build with a different board, board version, or project. For example, to build the `shim_controller_v0` project for version `1.0` of the Red Pitaya `sdrlab_122_16` board, you can run:
+```bash
+make BOARD=sdrlab_122_16 BOARD_VER=1.0 PROJECT=shim_controller_v0
+```
 
-WORK IN PROGRESS BELOW THIS POINT
----
+Boards and board versions are defined in the `boards/` directory, where the board files for a given board are given under `boards/[BOARD]/board_files/[BOARD_VER]/`. Projects are defined based on folders in the `projects/` directory, where each project has its own folder. Note that projects need to be configured to work with a specific board and board version -- this is done under `projects/[PROJECT]/cfg/[BOARD]/[BOARD_VER]/`, and requires configuration files for `petalinux` and the Vivado Xilinx Design Constraint `xdc` files. You can read more about the requirements for this configuration in the `projects/` directory's README file.
 
+## Intermediate build files and targets
+
+The Makefile is set up to build the project in a series of steps, with intermediate files stored in the `tmp/` directory. These targets can also be made individually, if you want to debug the build or explore the intermediate files. There are also some targets for cleaning or running tests. `Makefile` has a lot of comments, so feel free to check that out as well. The main targets are:
+
+### Default target
+- `all`: The default target, which will be run if no target is provided. This will build `sd` and `tests`.
+
+### Script targets
+- `tests`: Run tests for all cores in the project. Test summaries per core will be placed in `custom_cores/[vendor]/cores/[core]/tests/test_status`, and a summary of all core tests for the project will be placed in `projects/[project]/tests/core_tests_summary`.
+- `clean_project`: Remove a single project's intermediate and temporary files, including Vivado-packaged cores from `tmp/`
+- `clean_build`: Remove all the intermediate and temporary files, including Vivado-packaged cores from `tmp/`, as well as reports in `tmp_reports`.
+- `clean_tests`: Remove the `results` directory from all core test folders (under `custom_cores/[vendor]/cores/[core]/tests/`), but leave the `test_status` file.
+- `clean_test_results`: Remove the `test_status` file from all core test folders, as well as the `core_tests_summary` file from all project test folders (under `projects/[project]/tests/`). Runs `clean_tests` first.
+- `clean_all`: Run all the clean targets above and additionally remove any output files in `out/`.
+
+### Main build targets
+- `sd`: Build the full SD card files for the project (`rootfs` and `boot`), which will be placed in `out/[board]/[board_ver]/[project]/`.
+- `bit` Build a standalone bitstream for the project, which will be placed in `out/[board]/[board_ver]/[project]/`. This can be used if you're using a different workflow than PetaLinux and just want the bitstream file to load the FPGA configuration.
+- `rootfs`: Build the root filesystem half of the `sd` files
+- `boot`: Build the boot partition half of the `sd` files
+
+### Intermediate build targets
+- `cores`: Build all the Vivado-packaged custom cores for the project, which will be placed in `tmp/cores/[vendor]/[core]/`. This is the first step of the overall `sd` target.
+- `xpr`: Build the Vivado project file for the project, which will be placed at `tmp/[board]/[board_ver]/[project]/project.xpr`. This step requires `cores` and is part of the overall `sd` target.
+- `xsa`: Build the Vivado Xilinx hardware definition `XSA` file for the project, which will be placed at `tmp/[board]/[board_ver]/[project]/hw_def.xsa`. This step requires `xpr` and is part of the overall `sd` target.
+- `petalinux`: Build the PetaLinux project for the project, which will be the folder `tmp/[board]/[board_ver]/[project]/petalinux/`. This step requires `xsa` and is part of the overall `sd` target.
+
+There are other specific targets in the Makefile, but I don't recommend using them directly unless you know what you're doing. 
+
+## Using the Rev D Shim Amplifier
+
+Once you've built the Rev D Shim firmware, please refer to the README in the `projects/rev_d_shim/` directory for instructions on how to use it.
 
 # Example Projects
 
+To understand the build processes in this repo, it's recommended to explore the example projects in the `projects/` directory, as well as the README in the `projects/` directory itself. As a quick summary, each project has its own folder, and the example projects are prefixed with `ex##_`, where `##` is the example number. They're ordered to progressively build up the scripting and configuration concepts I personally needed to learn to build the Rev D Shim firmware, so they should be a good starting point for understanding how to build your own projects. 
+
+You should read through the README in each of their respective folders, but in brief, the example projects are:
+
+## EX01 -- Basics
+
+This example project is mostly a template for the minimum viable project. It will walk you through the basic steps that any project will use, explaining the fundamental Vivado and PetaLinux build steps, including how to incorporate basic software or files in the built SD card. This is necessary to build the Rev D Shim PS and PL components.
+
+## EX02 -- AXI Interface
+
+This example project explores more of the Vivado TCL scripting capabilities and demonstrates the basic AXI interface, which will be how the Zynq's CPU / processing system (PS) communicates with the FPGA / programmable logic (PL). It includes some playground software to try out various AXI interfaces. This is necessary for the Rev D Shim firmware to actually control the hardware, as it needs to communicate with the FPGA to set the shim channels and read the buffer data (among other things).
+
+## EX03 -- UART
+
+This example project demonstrates some configuration options for the PS's interfaces, including its UART interface. It's a good overview of how to connect the Zynq's PS to an external computer via a UART interface. This is necessary for the Rev D Shim firmware to communicate with an external host computer outside of the scanner room.
+
+## EX04 -- Interrupts
+
+This example project covers interrupts from the PL to the PS and software to handle that, allowing the PL to signal the PS when it needs attention. This is necessary for the safety features of the Rev D Shim firmware.
+
+## EX05 -- DMA
+
+This example project covers the Direct Memory Access (DMA) interface, which allows the PS to transfer data to and from the PL through the off-chip DDR memory.
+
 # Testing
+
+Testing is done using [cocotb](https://www.cocotb.org/), a Python-based testbench framework for digital design verification. It allows you to write tests in Python and run them in a simulator, such as Verilator. To install the tools needed for testing, please refer to the [Optional: Running tests](#optional-running-tests) section above.
+
+To run tests for a specific core, you can use the `test_core.sh` script in the `scripts/make/` directory with the `vendor` and `core` arguments. For example, to test the `fifo_sync` core from `lcb`, you can run:
+```bash
+./scripts/make/test_core.sh lcb fifo_sync
+```
+This will run the tests for the `fifo_sync` core under `custom_cores/lcb/cores/fifo_sync/tests/src` and output a test status report at `custom_cores/lcb/cores/fifo_sync/tests/test_status`.
+
+To run tests for all cores in a project, you can use the make target `tests`. For example, to run tests for the `rev_d_shim` project, you can run:
+```bash
+make tests PROJECT=rev_d_shim
+```

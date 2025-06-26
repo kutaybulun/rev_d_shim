@@ -46,10 +46,10 @@ ifeq ($(PETALINUX_VERSION),)
 $(error PetaLinux version environment variable PETALINUX_VERSION is not set)
 endif
 
-# Check if the target is only clean or clean_all (to avoid unnecessary checks)
+# Check if the target is only "clean" targets that don't care about the project or board to avoid checking the project and board.
 CLEAN_ONLY = false
 ifneq ($(),$(MAKECMDGOALS))
-ifeq ($(),$(filter-out clean clean_all,$(MAKECMDGOALS)))
+ifeq ($(),$(filter-out clean_build clean_tests clean_test_results clean_all,$(MAKECMDGOALS)))
 CLEAN_ONLY = true
 endif
 endif
@@ -103,37 +103,57 @@ RM = rm -rf
 
 
 #############################################
-## Make-specific targets (clean, all, .PHONY, etc.)
+## Make-specific targets (.PHONY, etc.)
 #############################################
 
 # Files not to delete on half-completion (GNU Make 4.9)
 .PRECIOUS: tmp/cores/% tmp/%.xpr tmp/%.bit
 
 # Targets that aren't real files (GNU Make 4.9)
-.PHONY: all clean clean_project clean_all bit sd rootfs boot tests cores xpr xsa petalinux petalinux_build
+.PHONY: all tests clean_project clean_build clean_tests clean_test_results clean_all bit sd rootfs boot cores xpr xsa petalinux petalinux_build
 
 # Enable secondary expansion (GNU Make 3.9) to allow for more complex pattern matching (see cores target)
 .SECONDEXPANSION:
 
 # Default target is the first listed (GNU Make 2.3)
-all: sd
+all: sd tests
+
+
+#############################################
+## Script targets (tests, clean- targets)
+#############################################
+
+
+# Test summary for all the custom cores necessary for the project
+tests: projects/${PROJECT}/tests/core_tests_summary
 
 # Remove a single project's intermediate and temporary files, including cores
 clean_project:
 	@./scripts/make/status.sh "CLEANING PROJECT: $(BOARD)/$(BOARD_VER)/$(PROJECT)"
 	$(RM) tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)
-	$(RM) -r $(addsuffix *, $(addprefix tmp/custom_cores/, $(PROJECT_CORES)))
+	$(RM) $(addsuffix *, $(addprefix tmp/custom_cores/, $(PROJECT_CORES)))
 
 # Remove all the intermediate and temporary files
-clean:
+clean_build:
 	@./scripts/make/status.sh "CLEANING"
 	$(RM) .Xil
 	$(RM) tmp
 	$(RM) tmp_reports
 
+# Remove all the result files from the tests, leaving the test status
+clean_tests:
+	@./scripts/make/status.sh "CLEANING TESTS"
+	$(RM) custom_cores/*/cores/*/tests/results
+
+# Clean all test status and summary files from custom cores and projects 
+clean_test_results: clean_tests
+	@./scripts/make/status.sh "CLEANING TEST RESULTS"
+	$(RM) custom_cores/*/cores/*/tests/test_status
+	$(RM) projects/*/tests/core_tests_summary
+
 # Remove all the output files too
-clean_all: clean
-	@./scripts/make/status.sh "CLEANING OUTPUT FILES"
+clean_all: clean_build clean_test_results
+	@./scripts/make/status.sh "FULL CLEAN"
 	$(RM) out
 
 #############################################
@@ -165,16 +185,12 @@ boot: tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)/petalinux/images/linux/BOOT.tar.gz
 	mkdir -p out/$(BOARD)/$(BOARD_VER)/$(PROJECT)
 	cp tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)/petalinux/images/linux/BOOT.tar.gz out/$(BOARD)/$(BOARD_VER)/$(PROJECT)/BOOT.tar.gz
 
-
 #############################################
 
 
 #############################################
 ## Custom intermediate targets (could be used directly for testing)
 #############################################
-
-# Test summary for all the custom cores necessary for the project
-tests: projects/${PROJECT}/tests/core_tests_summary
 
 # All the cores necessary for the project
 # Separated in `tmp/cores` by vendor

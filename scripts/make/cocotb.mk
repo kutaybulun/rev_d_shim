@@ -57,6 +57,7 @@ test_custom_core:
 		$(MAKE) --file="$(firstword $(MAKEFILE_LIST))" sim MODULE=$(CORE_NAME)_test TOPLEVEL=$(CORE_NAME); \
 	RESULT=$$?; \
 	mv dump.vcd $(RESULTS_DIR)/dump.vcd; \
+	rm -rf __pycache__; \
 	if [ $$RESULT -ne 0 ]; then exit $$RESULT; fi
 
 clean_test:

@@ -1,20 +1,9 @@
 #!/bin/bash
-# Build a PetaLinux project for the given board and project
+# Tests a custom core with cocotb. Uses the shared Makefile in scripts/make/cocotb.mk.
 # Arguments: <vendor> <core>
 # Usage: test_core.sh <vendor> <core>
 # Example:
 #   ./scripts/make/test_core.sh lcb shim_hw_manager
-#
-# What it does:
-#   1) cd into custom_cores/<vendor>/cores/<core>/tests/
-#   2) run “make <core>_test” (this assumes that the Makefile inside tests/ defines a target named exactly "<core>_test")
-#   3) if make returns nonzero (e.g. Verilator compile errors), mark “failed tests”
-#      else, check results.xml: (if tests are run by default, cocotb will create results.xml) 
-#        – if results.xml contains any <failure tags, mark “failed tests”
-#        – otherwise mark “passed tests”
-#   4) write the one‐line status file into
-#      custom_cores/<vendor>/cores/<core>/tests/test_status
-#
 
 if [ $# -ne 2 ]; then
   echo "[CORE TESTS] ERROR:"
