@@ -5,20 +5,27 @@
 # Minimum check: None
 
 # Parse arguments
-if [ $# -lt 3 ] || [ $# -gt 4 ] || ( [ $# -eq 4 ] && [ "$4" != "--full" ] ); then
+FULL_CHECK=false
+
+# Loop through arguments to find --full and assign positional parameters
+ARGS=()
+for arg in "$@"; do
+  if [[ "$arg" == "--full" ]]; then
+    FULL_CHECK=true
+  else
+    ARGS+=("$arg")
+  fi
+done
+
+if [ ${#ARGS[@]} -ne 3 ]; then
   echo "[CHECK PROJECT DIR] ERROR:"
   echo "Usage: $0 <board_name> <board_version> <project_name> [--full]"
   exit 1
 fi
-FULL_CHECK=false
-if [[ "$4" == "--full" ]]; then
-  FULL_CHECK=true
-fi
 
-# Store the positional parameters in named variables and clear them
-BRD=${1}
-VER=${2}
-PRJ=${3}
+BRD=${ARGS[0]}
+VER=${ARGS[1]}
+PRJ=${ARGS[2]}
 PBV="project \"${PRJ}\" and board \"${BRD}\" v${VER}"
 set --
 
@@ -39,10 +46,10 @@ if [ ! -d "projects/${PRJ}" ]; then
   exit 1
 fi
 
-# Check that the block design TCL file exists
+# Check that the block design Tcl file exists
 if [ ! -f "projects/${PRJ}/block_design.tcl" ]; then
   echo "[CHECK PROJECT DIR] ERROR:"
-  echo "Block design TCL file not found for project \"${PRJ}\""
+  echo "Block design Tcl file not found for project \"${PRJ}\""
   echo " Path: projects/${PRJ}/block_design.tcl"
   exit 1
 fi

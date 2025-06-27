@@ -1,4 +1,4 @@
-## Example TCL script to create ports that match the default SDRlab 122.88-16 ports.xdc
+## Example Tcl script to create ports that match the default SDRlab 122.88-16 ports.xdc
 
 ### ADC
 

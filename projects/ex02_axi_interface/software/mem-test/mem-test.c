@@ -12,7 +12,7 @@
 
 #define CMA_ALLOC _IOWR('Z', 0, uint32_t)
 
-// Addresses are defined in the hardware design TCL file
+// Addresses are defined in the hardware design Tcl file
 #define AXI_CFG  (uint32_t) 0x40000000
 #define AXI_STS  (uint32_t) 0x41000000
 #define AXI_FIFO (uint32_t) 0x42000000
@@ -75,7 +75,7 @@ int main()
   }
 
   // Map CFG and STS registers
-  // Addresses are defined in the hardware design TCL file
+  // Addresses are defined in the hardware design Tcl file
   printf("Mapping registers and ports...\n");
 
   // CFG register

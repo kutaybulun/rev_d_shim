@@ -13,6 +13,7 @@ PROJECT ?= rev_d_shim
 BOARD ?= snickerdoodle_black
 BOARD_VER ?= 1.0
 OFFLINE ?= false
+MOUNT_DIR ?= # empty by default, set to the mount point of the SD card if needed
 
 #############################################
 
@@ -49,7 +50,7 @@ endif
 # Check if the target is only "clean" targets that don't care about the project or board to avoid checking the project and board.
 CLEAN_ONLY = false
 ifneq ($(),$(MAKECMDGOALS))
-ifeq ($(),$(filter-out clean_build clean_tests clean_test_results clean_all,$(MAKECMDGOALS)))
+ifeq ($(),$(filter-out clean_sd clean_build clean_tests clean_test_results clean_all,$(MAKECMDGOALS)))
 CLEAN_ONLY = true
 endif
 endif
@@ -110,7 +111,7 @@ RM = rm -rf
 .PRECIOUS: tmp/cores/% tmp/%.xpr tmp/%.bit
 
 # Targets that aren't real files (GNU Make 4.9)
-.PHONY: all tests clean_project clean_build clean_tests clean_test_results clean_all bit sd rootfs boot cores xpr xsa petalinux petalinux_build
+.PHONY: all tests write_sd clean_sd clean_project clean_build clean_tests clean_test_results clean_all bit sd rootfs boot cores xpr xsa petalinux petalinux_build
 
 # Enable secondary expansion (GNU Make 3.9) to allow for more complex pattern matching (see cores target)
 .SECONDEXPANSION:
@@ -126,6 +127,16 @@ all: sd tests
 
 # Test summary for all the custom cores necessary for the project
 tests: projects/${PROJECT}/tests/core_tests_summary
+
+# Write the SD card image to the mount point
+write_sd: sd
+	@./scripts/make/status.sh "WRITING SD CARD IMAGE"
+	./scripts/make/write_sd.sh $(BOARD) $(BOARD_VER) $(PROJECT) $(MOUNT_DIR)
+
+# Clean the SD card image at the mount point
+clean_sd:
+	@./scripts/make/status.sh "CLEANING SD CARD IMAGE"
+	./scripts/make/clean_sd.sh $(MOUNT_DIR)
 
 # Remove a single project's intermediate and temporary files, including cores
 clean_project:
@@ -200,7 +211,7 @@ boot: tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)/petalinux/images/linux/BOOT.tar.gz
 cores: $(addprefix tmp/custom_cores/, $(PROJECT_CORES))
 
 # The Xilinx project file
-# This file can be edited in Vivado to test TCL commands and changes
+# This file can be edited in Vivado to test Tcl commands and changes
 xpr: tmp/$(BOARD)/$(BOARD_VER)/$(PROJECT)/project.xpr
 
 # The hardware definition file

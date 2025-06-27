@@ -6,6 +6,8 @@ Also heavily informed by the Open-MRI OCRA project (which was forked off of Pave
 
 Primarily written by Lincoln Craven-Brightman, with contributions from Kutay Bulun, Thomas Witzel, and H. Fatih Uǧurdag. The Revision D Shim firmware is designed to work with Don Straney's [Linear Shim hardware (GitHub)](https://github.com/stockmann-lab/shim_amp_hardware_linear). The project is at the request and funding of Jason Stockmann, and is a continuation of the work done by Nick Arango and Irene Kuang on previous revisions of the Shim Amplifier system.
 
+***Updated 2025-06-27***
+
 # Overview
 
 This repository contains the source code and documentation for the Revision D Shim Amplifier system, as well as a general build framework if you're interested in modifying the system or building your own projects for a Zynq 7000 series SoC. These projects build the files for a bootable SD card that contain the Linux operating system, custom software, and FPGA bitstreams used in that project, which will fully configure your board.
@@ -301,7 +303,7 @@ sudo make install
 
 This section will walk you through the build process of a fully formed bootable Micro SD card for the Snickerdoodle Black containing the Rev D Shim firmware, Linux operating system, and FPGA bitstream. If you want to understand the steps in more detail, go through the [Example Projects](#example-projects) section, which progressively build up the components and techniques used for the Rev D Shim firmware.
 
-The entire build process is scripted by the `Makefile` and various shell and TCL scripts in the `scripts/` directory. The main entry point is the `Makefile`, which will call the appropriate scripts to build the project. The default target and variables for the `Makefile` is the Rev D Shim firmware for the Snickerdoodle Black. As such, you can simply run the following command from the root of this repository to build the SD card:
+The entire build process is scripted by the `Makefile` and various shell and Tcl scripts in the `scripts/` directory. The main entry point is the `Makefile`, which will call the appropriate scripts to build the project. The default target and variables for the `Makefile` is the Rev D Shim firmware for the Snickerdoodle Black. As such, you can simply run the following command from the root of this repository to build the SD card:
 ```bash
 make
 ```
@@ -356,6 +358,8 @@ The Makefile is set up to build the project in a series of steps, with intermedi
 
 ### Script targets
 - `tests`: Run tests for all cores in the project. Test summaries per core will be placed in `custom_cores/[vendor]/cores/[core]/tests/test_status`, and a summary of all core tests for the project will be placed in `projects/[project]/tests/core_tests_summary`.
+- `write_sd`: Write the SD card files to the SD card. The default mount point is `/media/[username]/`, but can be overridden with the `MOUNT_DIR` variable. This will write the `BOOT.tar.gz` and `rootfs.tar.gz` files to the appropriate partitions on the SD card, as described in the [Building an SD card](#building-an-sd-card) section. Uses the `scripts/make/write_sd.sh` script.
+- `clean_sd`: Clean the SD card files from a mounted SD card. The default mount point is `/media/[username]/`, but can be overridden with the `MOUNT_DIR` variable. Uses the `scripts/make/clean_sd.sh` script. 
 - `clean_project`: Remove a single project's intermediate and temporary files, including Vivado-packaged cores from `tmp/`
 - `clean_build`: Remove all the intermediate and temporary files, including Vivado-packaged cores from `tmp/`, as well as reports in `tmp_reports`.
 - `clean_tests`: Remove the `results` directory from all core test folders (under `custom_cores/[vendor]/cores/[core]/tests/`), but leave the `test_status` file.
@@ -392,7 +396,7 @@ This example project is mostly a template for the minimum viable project. It wil
 
 ## EX02 -- AXI Interface
 
-This example project explores more of the Vivado TCL scripting capabilities and demonstrates the basic AXI interface, which will be how the Zynq's CPU / processing system (PS) communicates with the FPGA / programmable logic (PL). It includes some playground software to try out various AXI interfaces. This is necessary for the Rev D Shim firmware to actually control the hardware, as it needs to communicate with the FPGA to set the shim channels and read the buffer data (among other things).
+This example project explores more of the Vivado Tcl scripting capabilities and demonstrates the basic AXI interface, which will be how the Zynq's CPU / processing system (PS) communicates with the FPGA / programmable logic (PL). It includes some playground software to try out various AXI interfaces. This is necessary for the Rev D Shim firmware to actually control the hardware, as it needs to communicate with the FPGA to set the shim channels and read the buffer data (among other things).
 
 ## EX03 -- UART
 

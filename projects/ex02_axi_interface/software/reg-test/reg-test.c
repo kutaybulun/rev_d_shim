@@ -9,7 +9,7 @@
 
 #define CMA_ALLOC _IOWR('Z', 0, uint32_t)
 
-// Addresses are defined in the hardware design TCL file
+// Addresses are defined in the hardware design Tcl file
 #define AXI_CFG 0x40000000
 #define AXI_STS 0x41000000
 
@@ -79,7 +79,7 @@ int main()
   }
 
   // Map CFG and STS registers
-  // Addresses are defined in the hardware design TCL file
+  // Addresses are defined in the hardware design Tcl file
   // sysconf(_SC_PAGESIZE) is the minimum size to map, as it's the size of a memory page
   printf("Mapping CFG and STS registers...\n");
   cfg = mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ|PROT_WRITE, MAP_SHARED, fd, AXI_CFG);

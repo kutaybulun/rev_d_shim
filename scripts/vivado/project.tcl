@@ -171,7 +171,7 @@ proc init_ps {ps_name {ps_props {}} {ps_conn {}}} {
 
 
 # Procedure for creating a module from a tcl section
-#  module_src:  name of the TCL source file to include
+#  module_src:  name of the Tcl source file to include
 #  module_name: name of the module
 #  module_conn: dictionary of pins to wire (put the local name first)
 proc module {module_src module_name {module_conn {}}} {

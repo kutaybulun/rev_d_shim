@@ -3,8 +3,8 @@
 Example 02 is a demonstration of some basic AXI interfaces.
 
 The project introduces the following tools and concepts:
-- TCL scripting for block design creation
-- TCL scripting for submodules
+- Tcl scripting for block design creation
+- Tcl scripting for submodules
 - Custom block design cores
 - AXI memory interfaces and mapping
 - BRAM block sizes and usage
@@ -18,9 +18,9 @@ The project introduces the following tools and concepts:
 
 ## Tools and Concepts
 
-### TCL Scripting for Block Design Creation
+### Tcl Scripting for Block Design Creation
 
-### TCL Scripting for Submodules
+### Tcl Scripting for Submodules
 
 ### Custom Block Design Cores
 

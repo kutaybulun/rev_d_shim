@@ -20,13 +20,13 @@ A project directory should follow the following structure:
 │           └── [file_name].xdc         - XDC file for the project. Require .xdc extension.
 │                                           These files define the hardware interface for the project and board.
 │                                           They must match the ports defined in the block design.
-├── modules/                            - [OPTIONAL] TCL scripts for block-design modules used in the project.
-│   └── [module_name].tcl               - [OPTIONAL] TCL script for a module used in the block design
+├── modules/                            - [OPTIONAL] Tcl scripts for block-design modules used in the project.
+│   └── [module_name].tcl               - [OPTIONAL] Tcl script for a module used in the block design
 │                                           Modules are included using the "module" procedure, either in 
 │                                           block_design.tcl or in another module script.
 ├── rootfs_include/                     - [OPTIONAL] Files to be included in the PetaLinux root filesystem when built.
 ├── software/                           - [OPTIONAL] Software source files for the project (e.g. C, C++, Rust, Python).
-├── block_design.tcl                    - TCL script that constructs the programmable logic for the project.
+├── block_design.tcl                    - Tcl script that constructs the programmable logic for the project.
 │                                           This script can use procedures defined in scripts/vivado/project.tcl
 │                                           like `cell`, `module`, `init_ps` etc. to easily build the block design.
 │                                           It includes any port definitions of the block design.

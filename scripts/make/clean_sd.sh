@@ -1,23 +1,17 @@
 #!/bin/bash
-# Clear the BOOT and RootFS directories for the given board and project
-# Arguments: <board_name> <board_version> <project_name> [<mount_directory>]
-if [ $# -lt 3 ] || [ $# -gt 4 ]; then
+# Clean the BOOT and RootFS directories for the given board and project
+# Argument: [<mount_directory>]
+if [ $# -gt 1 ]; then
   echo "[CLEAR SD] ERROR:"
-  echo "Usage: $0 <board_name> <board_version> <project_name> [<mount_directory>]"
+  echo "Usage: $0 [<mount_directory>]"
   exit 1
 fi
 
-# Store the positional parameters in named variables
-BRD=${1}
-VER=${2}
-PRJ=${3}
-if [ $# -eq 4 ]; then
-  MNT=${4}
+if [ $# -eq 1 ]; then
+  MNT=${1}
 else
   MNT="/media/$(whoami)"
 fi
-PBV="project \"${PRJ}\" and board \"${BRD}\" v${VER}"
-set --
 
 # If any subsequent command fails, exit immediately
 set -e
@@ -44,21 +38,21 @@ if [ ! -d "${MNT}/RootFS" ]; then
 fi
 
 # Verify with a confirmation prompt
-echo "[CLEAR SD] WARNING: This will clear the BOOT and RootFS directories for ${PBV} at ${MNT}"
+echo "[CLEAR SD] WARNING: This will clear the BOOT and RootFS directories at ${MNT}"
 echo "[CLEAR SD] Are you sure you want to proceed? (y/n)"
 read -r CONFIRM
 if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
   echo "[CLEAR SD] Aborting."
   exit 0
 fi
-echo "[CLEAR SD] Proceeding to clear BOOT and RootFS directories for ${PBV} at ${MNT}"
+echo "[CLEAR SD] Proceeding to clear BOOT and RootFS directories at ${MNT}"
 
 # Clear the BOOT directory
-echo "[CLEAR SD] Clearing BOOT directory for ${PBV} at ${MNT}/BOOT (needs sudo)"
+echo "[CLEAR SD] Clearing BOOT directory at ${MNT}/BOOT (needs sudo)"
 sudo rm -rf ${MNT}/BOOT/*
 
 # Clear the RootFS directory
-echo "[CLEAR SD] Clearing RootFS directory for ${PBV} at ${MNT}/RootFS (needs sudo)"
+echo "[CLEAR SD] Clearing RootFS directory at ${MNT}/RootFS (needs sudo)"
 sudo rm -rf ${MNT}/RootFS/*
 
-echo "[CLEAR SD] Successfully cleared BOOT and RootFS directories for ${PBV}"
+echo "[CLEAR SD] Successfully cleared BOOT and RootFS directories"

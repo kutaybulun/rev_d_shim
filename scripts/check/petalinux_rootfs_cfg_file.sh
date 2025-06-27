@@ -5,20 +5,27 @@
 # Minimum check: PetaLinux system config (includes project source, PetaLinux environment, and PetaLinux config directory)
 
 # Parse arguments
-if [ $# -lt 3 ] || [ $# -gt 4 ] || ( [ $# -eq 4 ] && [ "$4" != "--full" ] ); then
+FULL_CHECK=false
+
+# Loop through arguments to find --full and assign positional parameters
+ARGS=()
+for arg in "$@"; do
+  if [[ "$arg" == "--full" ]]; then
+    FULL_CHECK=true
+  else
+    ARGS+=("$arg")
+  fi
+done
+
+if [ ${#ARGS[@]} -ne 3 ]; then
   echo "[CHECK PTLNX ROOTFS CFG] ERROR:"
   echo "Usage: $0 <board_name> <board_version> <project_name> [--full]"
   exit 1
 fi
-FULL_CHECK=false
-if [[ "$4" == "--full" ]]; then
-  FULL_CHECK=true
-fi
 
-# Store the positional parameters in named variables and clear them
-BRD=${1}
-VER=${2}
-PRJ=${3}
+BRD=${ARGS[0]}
+VER=${ARGS[1]}
+PRJ=${ARGS[2]}
 PBV="project \"${PRJ}\" and board \"${BRD}\" v${VER}"
 set --
 
