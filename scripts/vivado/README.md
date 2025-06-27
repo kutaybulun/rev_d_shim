@@ -1,5 +1,5 @@
 ***Update 2025-06-27***
-# `vivado/` scripts
+# `vivado` scripts
 
 These scripts are for managing the Vivado build process. Vivado uses Tcl commands for all of its tasks and steps, which can be scripted and loaded, allowing for a fully automated build process. These scripts are used to create the Vivado project, build the block design, and package the bitstream and hardware definition into output files for PetaLinux to load. They are run by Vivado itself, passed in via the command line by the Makefile.
 
