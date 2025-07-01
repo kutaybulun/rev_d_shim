@@ -54,7 +54,7 @@ test_custom_core:
 	mkdir -p $(RESULTS_DIR)
 	COCOTB_RESULTS_FILE=$(COCOTB_RESULTS_FILE) SIM_BUILD=$(SIM_BUILD) \
 		RESULTS_DIR=$(RESULTS_DIR) \
-		$(MAKE) --file="$(firstword $(MAKEFILE_LIST))" sim MODULE=$(CORE_NAME)_test TOPLEVEL=$(CORE_NAME); \
+		$(MAKE) --file="$(firstword $(MAKEFILE_LIST))" sim MODULE=testbench TOPLEVEL=$(CORE_NAME); \
 	RESULT=$$?; \
 	mv dump.vcd $(RESULTS_DIR)/dump.vcd; \
 	rm -rf __pycache__; \

@@ -29,7 +29,7 @@ STS_FILE="${TEST_DIR}/test_status"
 # Remove any old results.xml for a clean start
 rm -f "${TEST_DIR}/results/results.xml"
 
-# Enter the src directory where the Makefile is expected
+# Check the src directory where the testbench files
 if [ ! -d "${TEST_DIR}/src" ]; then
   echo "[CORE TESTS]: src directory not found in ${TEST_DIR} -- assuming no tests to run."
 
@@ -38,6 +38,13 @@ if [ ! -d "${TEST_DIR}/src" ]; then
   echo "[CORE TESTS] ${CORE}: Tests SKIPPED (see ${TEST_DIR}/${STS_FILE} details)"
 
   exit 0
+fi
+
+# Check if the top-level testbench file exists
+if [ ! -f "${TEST_DIR}/src/testbench.py" ]; then
+  echo "[CORE TESTS] ERROR: testbench.py not found in ${TEST_DIR}/src"
+  echo "Please ensure that the top-level cocotb testbench file is named 'testbench.py'."
+  exit 1
 fi
 
 echo "[CORE TESTS] Running tests for ${CORE} in ${TEST_DIR} using scripts/make/cocotb.mk"
