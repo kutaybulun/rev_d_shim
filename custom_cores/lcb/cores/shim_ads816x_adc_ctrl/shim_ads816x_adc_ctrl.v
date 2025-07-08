@@ -26,10 +26,11 @@ module shim_ads816x_adc_ctrl #(
   output reg         n_cs,
   output wire        mosi,
   input  wire        miso_sck,
+  input  wire        miso_resetn,
   input  wire        miso
 );
 
-  // Internal constants
+  // TODO: Make this external and locked when the SPI system is on
   // Minimum time for n_cs signal to be high (in clock cycles)
   // Calculation (different for each ADC model):
   //  - 50 MHz maximum SPI clock frequency
@@ -56,8 +57,8 @@ module shim_ads816x_adc_ctrl #(
   //      - ADS8168: max(33, 50 - 16) = max(33, 34) = 34 cycles
   //      - ADS8167: max(60, 100 - 16) = max(60, 84) = 84 cycles
   //      - ADS8166: max(125, 200 - 16) = max(125, 184) = 184 cycles
-  // Set N_CS_HIGH_TIME based on ADS_MODEL_ID
-  localparam [7:0] N_CS_HIGH_TIME = 
+  // Set n_cs_high_time based on ADS_MODEL_ID
+  wire [ 8:0] n_cs_high_time = 
     (ADS_MODEL_ID == 8) ? 8'd34 :    // ADS8168
     (ADS_MODEL_ID == 7) ? 8'd84 :    // ADS8167
     (ADS_MODEL_ID == 6) ? 8'd184 :   // ADS8166
@@ -109,7 +110,6 @@ module shim_ads816x_adc_ctrl #(
   wire        last_adc_word;
   wire        adc_spi_command_done;
   reg  [ 7:0] n_cs_timer;
-  wire [ 8:0] n_cs_high_time;
   reg         running_n_cs_timer;
   wire        cs_wait_done;
   reg  [ 3:0] adc_word_idx;
@@ -231,8 +231,6 @@ module shim_ads816x_adc_ctrl #(
     // TODO: Needs to check the MISO readback on boot
     if (!resetn) boot_fail <= 1'b0;
   end
-  // n_cs_high_time
-  assign n_cs_high_time = N_CS_HIGH_TIME;
 
 
   //// ADC word sequencing

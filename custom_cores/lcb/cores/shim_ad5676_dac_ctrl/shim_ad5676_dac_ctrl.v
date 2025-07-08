@@ -28,11 +28,12 @@ module shim_ad5676_dac_ctrl #(
   output reg         n_cs,
   output wire        mosi,
   input  wire        miso_sck,
+  input  wire        miso_resetn,
   input  wire        miso,
   output reg         ldac
 );
 
-  // Internal constants
+  // TODO: Make this external and locked when the SPI system is on
   // Minimum time for the n_cs signal to be high (in clock cycles)
   // Calculation: 
   //  - 50 MHz maximum SPI clock frequency
@@ -41,7 +42,10 @@ module shim_ad5676_dac_ctrl #(
   //  - 24 bits per SPI command
   //  - 42 - 24 = 18 clock cycles for n_cs to be high
   //  - Requires a minimum of 3 clock cycles for DAC word loading
-  localparam N_CS_HIGH_TIME = 5'd18;
+  wire [4:0] n_cs_high_time = 5'd18;
+
+  localparam DAC_TEST_CH = 3'd5; // DAC channel for testing (5 is nice for a clear binary value)
+  localparam DAC_TEST_VAL = 16'b1000000000001010; // Test value for DAC channel (near midrange is good)
 
   // DAC SPI command
   localparam SPI_CMD_REG_WRITE = 4'b0001; // DAC SPI command for register write to be later loaded with LDAC
@@ -99,7 +103,6 @@ module shim_ad5676_dac_ctrl #(
   wire        second_dac_channel_of_pair;
   wire        dac_spi_command_done;
   reg  [ 4:0] n_cs_timer;
-  wire [ 4:0] n_cs_high_time; // Timer for ~(Chip Select) (n_cs) high time
   reg         running_n_cs_timer; // Flag to indicate if CS timer is running
   wire        cs_wait_done;
   reg  [ 2:0] dac_channel;
@@ -111,10 +114,15 @@ module shim_ad5676_dac_ctrl #(
   reg  [47:0] mosi_shift_reg; // Shift register for DAC SPI data
   reg  [14:0] abs_dac_val [0:7]; // Stored absolute DAC values for each channel
   reg  [ 1:0] dac_load_stage;
-  // // DAC MISO signals
-  // reg  [15:0] miso_shift_reg; // Shift register for MISO data
-  // reg         read_miso_mosi_clk; // Indicate whether to read the MISO data (in MOSI clock domain)
-  // wire        read_miso; // Indicate whether to read the MISO data
+  // DAC MISO signals
+  reg  [14:0] miso_shift_reg; // Shift register for MISO data
+  wire [15:0] miso_data;
+  reg  [ 3:0] miso_bit; // MISO bit counter
+  reg         start_miso_mosi_clk; // Indicate whether to read the MISO data (in MOSI clock domain)
+  wire        start_miso; // Indicate whether to read the MISO data
+  wire        n_miso_data_ready_mosi_clk; // Indicate whether the MISO data is ready to be read in MOSI clock domain
+  wire [15:0] miso_data_mosi_clk; // MISO data in MOSI clock domain
+  wire        readback_match; // Indicate whether the readback matches the expected value
 
 
   //// State machine transitions
@@ -139,21 +147,21 @@ module shim_ad5676_dac_ctrl #(
   assign waiting_for_trig = (state == S_TRIG_WAIT);
   // State transition
   always @(posedge clk) begin
-    if (!resetn)                                         state <= S_RESET; // Reset to initial state
-    else if (error)                                      state <= S_ERROR; // Check for error states
-    else if (state == S_RESET)                           state <= S_INIT; // Start the setup initialization
-    else if (state == S_INIT)                            state <= S_TEST_WR; // Transition to TEST_WR first in initialization
-    else if (state == S_TEST_WR && dac_spi_command_done) state <= S_REQ_RD; // Transition to REQ_RD after writing test value
-    else if (state == S_REQ_RD && dac_spi_command_done)  state <= S_TEST_RD; // Transition to TEST_RD after requesting read
-    else if (state == S_TEST_RD && dac_spi_command_done) state <= S_IDLE; // Transition to IDLE after reading test value
-    else if (cancel_wait)                                state <= S_IDLE; // Cancel the current wait state if cancel command is received
-    else if (cmd_done)                                   state <= next_cmd_state; // Transition to state of next command if command is finished
-    else if (state == S_DAC_WR && dac_wr_done)           state <= wait_for_trig ? S_TRIG_WAIT : S_DELAY; // If the DAC write is done, go to the proper wait state
+    if (!resetn)                                                state <= S_RESET; // Reset to initial state
+    else if (error)                                             state <= S_ERROR; // Check for error states
+    else if (state == S_RESET)                                  state <= S_INIT; // Start the setup initialization
+    else if (state == S_INIT)                                   state <= S_TEST_WR; // Transition to TEST_WR first in initialization
+    else if (state == S_TEST_WR && dac_spi_command_done)        state <= S_REQ_RD; // Transition to REQ_RD after writing test value
+    else if (state == S_REQ_RD && dac_spi_command_done)         state <= S_TEST_RD; // Transition to TEST_RD after requesting read
+    else if (state == S_TEST_RD && ~n_miso_data_ready_mosi_clk) state <= S_IDLE; // Transition to IDLE after reading test value (mismatch will set error flag)
+    else if (cancel_wait)                                       state <= S_IDLE; // Cancel the current wait state if cancel command is received
+    else if (cmd_done)                                          state <= next_cmd_state; // Transition to state of next command if command is finished
+    else if (state == S_DAC_WR && dac_wr_done)                  state <= wait_for_trig ? S_TRIG_WAIT : S_DELAY; // If the DAC write is done, go to the proper wait state
   end
   // Setup done
   always @(posedge clk) begin
-    if (!resetn || state == S_ERROR) setup_done <= 1'b0; // Reset setup done on reset or error
-    else if (state == S_INIT) setup_done <= 1'b1; // Set setup done when entering INIT state
+    if (!resetn || (state == S_ERROR)) setup_done <= 1'b0; // Reset setup done on reset or error
+    else if ((state == S_TEST_RD) && ~n_miso_data_ready_mosi_clk && readout_match) setup_done <= 1'b1;
   end
 
 
@@ -188,13 +196,19 @@ module shim_ad5676_dac_ctrl #(
 
   //// Errors
   // Error flag
-  assign error = (state != S_TRIG_WAIT && trigger) // Unexpected trigger
+  assign error = (state == S_TEST_RD && ~n_miso_data_ready_mosi_clk && ~readback_match) // Readback mismatch (boot fail)
+                 || (state != S_TRIG_WAIT && trigger) // Unexpected trigger
                  || (state == S_DAC_WR && ldac_shared) // Unexpected LDAC assertion
                  || (next_cmd && next_cmd_state == S_ERROR) // Bad command
                  || (((cmd_done && expect_next) || read_next_dac_val_pair) && cmd_buf_empty) // Command buffer underflow
                  || cal_oob // Calibration value out of bounds
                  || dac_val_oob // DAC value out of bounds
-                 || boot_fail; // Boot fail flag
+  // Boot check fail
+  assign readback_match = (miso_data_mosi_clk == DAC_TEST_VAL); // Readback matches the test value
+  always @(posedge clk) begin
+    if (!resetn) boot_fail <= 1'b0; // Reset boot fail on reset
+    if (state == S_TEST_RD && ~n_miso_data_ready_mosi_clk) boot_fail <= ~readback_match; 
+  end
   // Unexpected trigger
   always @(posedge clk) begin
     if (!resetn) unexp_trig <= 1'b0;
@@ -267,16 +281,6 @@ module shim_ad5676_dac_ctrl #(
       end
     end
   end
-
-  //// DAC boot-up SPI sequence
-  // Boot fail flag
-  always @(posedge clk) begin
-    // TODO: Needs to check the MISO readback on boot
-    if (!resetn) boot_fail <= 1'b0; // Reset boot fail on reset
-  end
-  // n_cs_high_time (minimum of 3 clock cycles)
-  // TODO: Calculate this from the clock dividers
-  assign n_cs_high_time = (N_CS_HIGH_TIME > 5'd3) ? N_CS_HIGH_TIME : 5'd3;
 
   //// DAC word sequencing
   // DAC channel count status
@@ -390,19 +394,60 @@ module shim_ad5676_dac_ctrl #(
     else if (spi_bit > 0) mosi_shift_reg <= {mosi_shift_reg[46:0], 1'b0}; // Shift bits out
     else if (state == S_INIT) begin // If just exiting reset:
       // Load the shift register with the test value for boot-up sequence
-      mosi_shift_reg <= {spi_write_cmd(3'b101, 16'b1000000000001010), 24'b0}; // Load test value for channel 5
+      mosi_shift_reg <= {spi_write_cmd(DAC_TEST_CH, DAC_TEST_VAL), 24'b0}; // Load test value for test channel
     end else if (state == S_TEST_WR && dac_spi_command_done) begin // If finished with the test write:
       // Load the shift register with the read request and a write to reset the test value
-      mosi_shift_reg <= {spi_read_cmd(3'b101), spi_write_cmd(3'b101, {1'b1, 15'b0})}; // Read channel 5 and write midrange to reset test value
+      mosi_shift_reg <= {spi_read_cmd(DAC_TEST_CH), spi_write_cmd(3'b101, {1'b1, 15'b0})}; // Read test channel and write midrange to reset test value
     end else if (state == S_DAC_WR && dac_load_stage == DAC_LOAD_STAGE_CONV) begin
       // Load the shift register with the first DAC value and the second DAC value
       mosi_shift_reg <= {spi_write_cmd(dac_channel, signed_to_offset(first_dac_val_cal_signed)), 
                         spi_write_cmd(dac_channel + 1, signed_to_offset(second_dac_val_cal_signed))};
     end
   end
+  // Start MISO read in MOSI clock domain (should show up 1 cycle later on readback MISO clock than equivalent MOSI clock cycle)
+  always @(posedge clk) begin
+    if (!resetn || state == S_ERROR) start_miso_mosi_clk <= 1'b0; // Reset start MISO read signal on reset or error
+    else if (state == S_TEST_RD && spi_bit == 5'd16) start_miso_mosi_clk <= 1'b1;
+    else start_miso_mosi_clk <= 1'b0;
+  end
 
   //// SPI MISO control
-  // TODO: Handle MISO readback
+  // Start MISO synchonization
+  synchronizer start_miso_sync(
+    .clk(miso_sck), // MISO clock
+    .resetn(miso_resetn), // Reset for MISO clock domain
+    .din(start_miso_mosi_clk), // Start MISO read signal in MOSI clock domain
+    .dout(start_miso) // Start MISO read signal in MISO clock domain
+  )
+  // MISO FIFO
+  fifo_async #(
+    .DATA_WIDTH  (16), // MISO data width
+    .ADDR_WIDTH  (2) // FIFO address width (4 entries)
+  ) miso_fifo (
+    .wr_clk      (miso_sck), // MISO clock
+    .wr_rst_n    (miso_resetn), // Reset for MISO clock domain
+    .wr_data     (miso_data), // MISO data to write
+    .wr_en       (miso_bit == 4'd1), // Write MISO data when the bit counter is 1 (last bit is being read)
+
+    .rd_clk      (clk), // FPGA SCK
+    .rd_rst_n    (resetn),
+    .rd_data     (miso_data_mosi_clk),
+    .rd_en       (~n_miso_data_ready_mosi_clk), // Immediately read MISO data when available in the MOSI clock domain
+    .empty       (n_miso_data_ready_mosi_clk)
+  );
+  // MISO bit counter
+  always @(posedge miso_sck) begin
+    if (!miso_resetn) miso_bit <= 4'd0; // Reset MISO bit counter on reset
+    else if (miso_bit > 0) miso_bit <= miso_bit - 1; // Decrement MISO bit counter
+    else if (start_miso) miso_bit <= 4'd15; // Load MISO bit counter with 16 bits when starting MISO read
+  end
+  // MISO shift register
+  always @(posedge miso_sck) begin
+    if (!miso_resetn) miso_shift_reg <= 15'd0;
+    else if (miso_bit > 1) miso_shift_reg <= {miso_shift_reg[13:0], miso}; // Shift MISO data into the shift register
+    else if (start_miso) miso_shift_reg <= {14'd0, miso}; // Start MISO read
+  end
+  assign miso_data = {miso_shift_reg, miso}; // MISO data is the shift register with the last bit from MISO
 
   //// Functions for conversions
   // Convert from offset to signed     
