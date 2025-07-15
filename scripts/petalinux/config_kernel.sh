@@ -7,8 +7,8 @@ if [ $# -ne 4 ]; then
 fi
 
 # Check terminal size
-if [ $(tput cols) -lt 80 ] || [ $(tput lines) -lt 19 ]; then
-  echo "[PTLNX KERNEL CFG] ERROR: Terminal must be at least 80 columns wide and 19 lines tall."
+if [ $(tput cols) -lt 80 ] || [ $(tput lines) -lt 23 ]; then
+  echo "[PTLNX KERNEL CFG] ERROR: Terminal must be at least 80 columns wide and 23 lines tall."
   exit 1
 fi
 
@@ -146,38 +146,30 @@ if [ -f "${REV_D_DIR}/${KERNEL_CONFIG}" ]; then
     done
 fi
 
-# Backup bbappend and bsp.cfg files
-BBAPPEND_FILE="project-spec/meta-user/recipes-kernel/linux/linux-xlnx_%.bbappend"
-echo "[PTLNX KERNEL CFG] Backing up existing bbappend and bsp.cfg files"
-cp "${BBAPPEND_FILE}" "${BBAPPEND_FILE}.pre"
-cp "${BSP_CFG}" "${BSP_CFG}.pre"
+# Get a list of the files in the project-spec/meta-user/recipes-kernel/linux/linux-xlnx directory
+PRE_FILE_LIST=$(ls project-spec/meta-user/recipes-kernel/linux/linux-xlnx)
 
 # Allow user to update kernel config
 echo "[PTLNX KERNEL CFG] Launching petalinux-config -c kernel"
 petalinux-config -c kernel
 
-# Detect new user config file added to SRC_URI
-NEW_CFG=""
-diff "${BBAPPEND_FILE}.pre" "${BBAPPEND_FILE}" | grep 'file://user_' | grep '+' | while read -r line; do
-  NEW_CFG=$(echo "$line" | grep -o 'user_[^" ]*\.cfg')
-  if [ -n "$NEW_CFG" ]; then
-    break
-  fi
-done
+# Detect a possible new user config file added to project-spec/meta-user/recipes-kernel/linux/linux-xlnx
+NEW_CFG=$(comm -13 <(echo "$PRE_FILE_LIST" | sort) <(ls project-spec/meta-user/recipes-kernel/linux/linux-xlnx | sort) | head -n 1)
 
-if [ -n "$NEW_CFG" ] && [ -f "project-spec/meta-user/recipes-kernel/linux/${NEW_CFG}" ]; then
+# If there's a new user config file, append its contents to the kernel_config.cfg (or copy it if kernel_config.cfg doesn't exist)
+if [ -n "$NEW_CFG" ] && [ -f "project-spec/meta-user/recipes-kernel/linux/linux-xlnx/${NEW_CFG}" ]; then
   # Update kernel_config.cfg
   if [ -f "${REV_D_DIR}/${KERNEL_CONFIG}" ]; then
     echo "[PTLNX KERNEL CFG] Appending new kernel config lines to ${KERNEL_CONFIG}"
-    grep '^CONFIG_' "project-spec/meta-user/recipes-kernel/linux/${NEW_CFG}" >> "${REV_D_DIR}/${KERNEL_CONFIG}"
+    grep '^CONFIG_' "project-spec/meta-user/recipes-kernel/linux/linux-xlnx/${NEW_CFG}" >> "${REV_D_DIR}/${KERNEL_CONFIG}"
   else
     echo "[PTLNX KERNEL CFG] Copying new kernel config to ${KERNEL_CONFIG}"
-    cp "project-spec/meta-user/recipes-kernel/linux/${NEW_CFG}" "${REV_D_DIR}/${KERNEL_CONFIG}"
+    cp "project-spec/meta-user/recipes-kernel/linux/linux-xlnx/${NEW_CFG}" "${REV_D_DIR}/${KERNEL_CONFIG}"
   fi
 fi
 
+# Deduplicate CONFIG_ lines in kernel_config.cfg (keep last occurrence)
 if [ -f "${REV_D_DIR}/${KERNEL_CONFIG}" ]; then
-  # Deduplicate CONFIG_ lines in bsp.cfg (keep last occurrence)
   awk '
     /^CONFIG_/ {
       param = $1
@@ -195,8 +187,10 @@ if [ -f "${REV_D_DIR}/${KERNEL_CONFIG}" ]; then
       }
     }
   ' "${REV_D_DIR}/${KERNEL_CONFIG}" > "tmp_kernel_config.dedup"
-  mv "tmp_kernel_config.dedup" "${REV_D_DIR}/${KERNEL_CONFIG}}"
-  
+  mv "tmp_kernel_config.dedup" "${REV_D_DIR}/${KERNEL_CONFIG}"
+
   echo "[PTLNX KERNEL CFG] Kernel configuration updated and deduplicated in ${KERNEL_CONFIG}"
+else
+  echo "[PTLNX KERNEL CFG] No changes made to kernel configuration."
 fi
 
