@@ -50,7 +50,7 @@ cd petalinux
 
 # Initialize the project with the hardware description
 echo "[PTLNX PROJECT] Initializing default PetaLinux system configuration"
-petalinux-config --get-hw-description ../hw_def.xsa --silentconfig
+petalinux-config --get-hw-description ${REV_D_DIR}/tmp/${BRD}/${VER}/${PRJ}/hw_def.xsa --silentconfig
 
 # Check that the PetaLinux version matches the environment variable
 PETALINUX_CONF_PATH="components/yocto/layers/meta-petalinux/conf/distro/include/petalinux-version.conf"
@@ -67,12 +67,12 @@ fi
 
 # Patch the project configuration
 echo "[PTLNX PROJECT] Patching and configuring PetaLinux project"
-patch project-spec/configs/config ../../../../../projects/${PRJ}/cfg/${BRD}/${VER}/petalinux/${PETALINUX_VERSION}/config.patch
+patch project-spec/configs/config ${REV_D_DIR}/projects/${PRJ}/cfg/${BRD}/${VER}/petalinux/${PETALINUX_VERSION}/config.patch
 petalinux-config --silentconfig
 
 # Patch the root filesystem configuration
 echo "[PTLNX PROJECT] Initializing default PetaLinux root filesystem configuration"
 petalinux-config -c rootfs --silentconfig
 echo "[PTLNX PROJECT] Patching and configuring PetaLinux root filesystem"
-patch project-spec/configs/rootfs_config ../../../../../projects/${PRJ}/cfg/${BRD}/${VER}/petalinux/${PETALINUX_VERSION}/rootfs_config.patch
+patch project-spec/configs/rootfs_config ${REV_D_DIR}/projects/${PRJ}/cfg/${BRD}/${VER}/petalinux/${PETALINUX_VERSION}/rootfs_config.patch
 petalinux-config -c rootfs --silentconfig

@@ -46,14 +46,14 @@ cell pavel-demin:user:axi_cfg_register axi_irq {
 addr 0x40000000 128 axi_irq/S_AXI ps/M_AXI_GP0
 
 # IRQ concat (necessary for the IRQ to work properly)
-cell xilinx.com:ip:xlconcat:2.1 irq_concat {
-  NUM_PORTS 8
-} {}
 # cell xilinx.com:ip:xlconcat:2.1 irq_concat {
 #   NUM_PORTS 8
-# } {
-#   dout ps/IRQ_F2P
-# }
+# } {}
+cell xilinx.com:ip:xlconcat:2.1 irq_concat {
+  NUM_PORTS 8
+} {
+  dout ps/IRQ_F2P
+}
 
 # Slice 4 bits of the first 32 bits of the CFG register, 4 of the second
 for {set i 0} {$i < 4} {incr i} {

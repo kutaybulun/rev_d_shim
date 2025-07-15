@@ -20,7 +20,7 @@ set -e
 echo "[PTLNX OFFLINE] Setting PetaLinux project for ${PBV} up for offline build"
 # Check that the PetaLinux project exists
 ./scripts/check/petalinux_project.sh ${BRD} ${VER} ${PRJ}
-./scripts/check/petalinux_offline.sh ${BRD} ${VER} ${PRJ}
+./scripts/check/petalinux_offline.sh
 
 # Set config file path
 cfg_file="tmp/$BRD/$VER/$PRJ/petalinux/project-spec/configs/config"
