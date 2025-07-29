@@ -57,11 +57,15 @@ ifeq ($(PETALINUX_VERSION),)
 $(error PetaLinux version environment variable PETALINUX_VERSION is not set)
 endif
 
-# Check if the target is only "clean" targets that don't care about the project or board to avoid checking the project and board.
-CLEAN_ONLY = false
+# Check if the project and board matter for the make targets
+#   For instance, if the user runs 'make clean' or 'make help', the project and board do not matter
+#   and don't need to be checked
+PROJECT_MATTERS = true
+# If no targets, then the project and board do matter
 ifneq ($(),$(MAKECMDGOALS))
-ifeq ($(),$(filter-out clean_sd clean_build clean_tests clean_test_results clean_all,$(MAKECMDGOALS)))
-CLEAN_ONLY = true
+# If some targets are specified, check if none of them require the project and board
+ifeq ($(),$(filter-out help clean_sd clean_build clean_tests clean_test_results clean_all,$(MAKECMDGOALS)))
+PROJECT_MATTERS = false
 endif
 endif
 
@@ -72,8 +76,8 @@ else
 $(info ---- Making "$(MAKECMDGOALS)")
 endif
 
-# Run some checks and setup, but only if there are targets other than clean or clean_all
-ifneq (true, $(CLEAN_ONLY)) # Clean check
+# Run some checks and setup if the project and board matter for the make targets
+ifeq (true, $(PROJECT_MATTERS)) # Check if the project and board matter
 $(info ----  for project "$(PROJECT)" and board "$(BOARD)" version $(BOARD_VER))
 
 # Check the board, board version, and project
