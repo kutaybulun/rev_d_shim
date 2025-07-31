@@ -73,7 +73,7 @@ int main()
   print_help(); // Print available commands
   while(1) {
     printf("Enter command: ");
-    char input[256]; // Buffer for user input
+    char command[256]; // Buffer for user input
     char *num_endptr; // Pointer for strtoul, will mark the end of numerals
     fgets(command, sizeof(command), stdin); // Read user input string
     command[strcspn(command, "\n")] = 0; // Remove newline character
