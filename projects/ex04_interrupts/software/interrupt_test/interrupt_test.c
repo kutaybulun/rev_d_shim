@@ -447,6 +447,7 @@ void print_help()
   printf("help - Show this help message\n");
   printf("set <interrupt_num> <value> - Set a single interrupt (0-7, value: 0 to disable, 1 to enable)\n");
   printf("set_mask <mask> <value> - Set multiple interrupts with an 8-bit binary mask (e.g., 00001111) all to the given value\n");
+  printf("set_all <value> - Set all interrupts to the given value (0 to disable, 1 to enable)\n");
   printf("hard_set <value> - Hard set all interrupts to the given 8-bit binary value (e.g., 00001111)\n");
   printf("clear <interrupt_num> - Clear (on the PS side) a single interrupt (0-7)\n");
   printf("clear_mask <mask> - Clear (on the PS side) multiple interrupts with an 8-bit binary mask\n");
