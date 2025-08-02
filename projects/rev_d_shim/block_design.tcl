@@ -101,16 +101,25 @@ create_bd_port -dir O -from 0 -to 0 n_MOSI_SCK_p
 # (~SCKI-)
 create_bd_port -dir O -from 0 -to 0 n_MOSI_SCK_n
 
+###############################################################################
+
+### 0 and 1 constants to fill bits for unused boards
+cell xilinx.com:ip:xlconstant:1.1 const_0 {
+  CONST_VAL 0
+} {}
+cell xilinx.com:ip:xlconstant:1.1 const_1 {
+  CONST_VAL 1
+} {}
 
 ###############################################################################
 
 ### Create processing system
-# Enable M_AXI_GP0 and S_AXI_ACP
-# Tie AxUSER pins to 1 for ACP port (to enable coherency)
+# Enable M_AXI_GP0 and M_AXI_GP1
 # Enable UART1 on the correct MIO pins
 # UART1 baud rate 921600
 # Pullup for UART1 RX
 # Enable I2C0 on the correct MIO pins
+# Set FCLK0 to 100 MHz
 # Turn off FCLK1-3 and reset1-3
 init_ps ps {
   PCW_USE_M_AXI_GP0 1
@@ -122,6 +131,7 @@ init_ps ps {
   PCW_MIO_37_PULLUP enabled
   PCW_I2C0_PERIPHERAL_ENABLE 1
   PCW_I2C0_I2C0_IO {MIO 38 .. 39}
+  PCW_FPGA0_PERIPHERAL_FREQMHZ 100
   PCW_EN_CLK1_PORT 0
   PCW_EN_CLK2_PORT 0
   PCW_EN_CLK3_PORT 0
@@ -140,14 +150,13 @@ cell xilinx.com:ip:proc_sys_reset:5.0 ps_rst {} {
   slowest_sync_clk ps/FCLK_CLK0
 }
 
-
 ### AXI Smart Connect
-cell xilinx.com:ip:smartconnect:1.0 ps_periph_axi_intercon {
+cell xilinx.com:ip:smartconnect:1.0 sys_cfg_axi_intercon {
   NUM_SI 1
   NUM_MI 4
 } {
   aclk ps/FCLK_CLK0
-  S00_AXI /ps/M_AXI_GP0
+  S00_AXI ps/M_AXI_GP0
   aresetn ps_rst/peripheral_aresetn
 }
 
@@ -167,7 +176,7 @@ cell lcb:user:shim_axi_sys_ctrl axi_sys_ctrl {
 } {
   aclk ps/FCLK_CLK0
   aresetn ps_rst/peripheral_aresetn
-  S_AXI ps_periph_axi_intercon/M00_AXI
+  S_AXI sys_cfg_axi_intercon/M00_AXI
 }
 addr 0x40000000 128 axi_sys_ctrl/S_AXI ps/M_AXI_GP0
   
@@ -175,12 +184,7 @@ addr 0x40000000 128 axi_sys_ctrl/S_AXI ps/M_AXI_GP0
 ###############################################################################
 
 ### Hardware manager
-cell lcb:user:shim_hw_manager hw_manager {
-  POWERON_WAIT   250000000
-  BUF_LOAD_WAIT  250000000
-  SPI_START_WAIT 250000000
-  SPI_STOP_WAIT  250000000
-} {
+cell lcb:user:shim_hw_manager hw_manager {} {
   clk ps/FCLK_CLK0
   aresetn ps_rst/peripheral_aresetn
   sys_en axi_sys_ctrl/sys_en
@@ -196,11 +200,21 @@ cell lcb:user:shim_hw_manager hw_manager {
 }
 
 ## Shutdown sense
-cell lcb:user:shim_shutdown_sense shutdown_sense {
-  CLK_FREQ_HZ 100000000
-} {
+# Set which shutdown sense channels are connected
+cell xilinx.com:ip:xlconcat:2.1 shutdown_sense_connected {
+  NUM_PORTS 8
+} {}
+for {set i 0} {$i < $board_count} {incr i} {
+  wire shutdown_sense_connected/In${i} const_1/dout
+}
+for {set i $board_count} {$i < 8} {incr i} {
+  wire shutdown_sense_connected/In${i} const_0/dout
+}
+# Shutdown sense module
+cell lcb:user:shim_shutdown_sense shutdown_sense {} {
   clk ps/FCLK_CLK0
   shutdown_sense_en hw_manager/shutdown_sense_en
+  shutdown_sense_connected shutdown_sense_connected/dout
   shutdown_sense_pin Shutdown_Sense
   shutdown_sense hw_manager/shutdown_sense
   shutdown_sense_sel Shutdown_Sense_Sel
@@ -224,7 +238,7 @@ cell xilinx.com:ip:clk_wiz:6.0 spi_clk {
 } {
   s_axi_aclk ps/FCLK_CLK0
   s_axi_aresetn ps_rst/peripheral_aresetn
-  s_axi_lite ps_periph_axi_intercon/M03_AXI
+  s_axi_lite sys_cfg_axi_intercon/M03_AXI
   clk_in1 Scanner_10Mhz_In
   power_down hw_manager/spi_clk_power_n
 }
@@ -320,7 +334,7 @@ cell pavel-demin:user:axi_sts_register status_reg {
 } {
   aclk ps/FCLK_CLK0
   aresetn ps_rst/peripheral_aresetn
-  S_AXI ps_periph_axi_intercon/M01_AXI
+  S_AXI sys_cfg_axi_intercon/M01_AXI
 }
 addr 0x40100000 128 status_reg/S_AXI ps/M_AXI_GP0
 ## Concatenation
@@ -353,10 +367,10 @@ cell lcb:user:axi_sts_alert_reg fifo_unavailable_reg {
 } {
   aclk ps/FCLK_CLK0
   aresetn ps_rst/peripheral_aresetn
-  S_AXI ps_periph_axi_intercon/M02_AXI
+  S_AXI sys_cfg_axi_intercon/M02_AXI
   sts_data axi_spi_interface/fifo_ps_side_unavailable
 }
-addr 0x40110000 128 status_reg/S_AXI ps/M_AXI_GP0
+addr 0x40110000 128 fifo_unavailable_reg/S_AXI ps/M_AXI_GP0
 
 ## IRQ interrupt concat
 cell xilinx.com:ip:xlconcat:2.1 irq_concat {
