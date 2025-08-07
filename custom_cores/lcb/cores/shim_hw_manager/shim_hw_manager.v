@@ -79,7 +79,8 @@ module shim_hw_manager #(
               S_POWER_ON_AMP_BRD  = 4'd5,
               S_AMP_POWER_WAIT    = 4'd6,
               S_RUNNING           = 4'd7,
-              S_HALTED            = 4'd8;
+              S_HALTING           = 4'd8,
+              S_HALTED            = 4'd9;
 
   //// Status codes
   // Basic system
@@ -150,21 +151,17 @@ module shim_hw_manager #(
           if (sys_en) begin
             // Check for out of bounds configuration values
             if (integ_thresh_avg_oob) begin // Integrator threshold average out of bounds
-              state <= S_HALTED;
+              state <= S_HALTING;
               status_code <= STS_INTEG_THRESH_AVG_OOB;
-              ps_interrupt <= 1;
             end else if (integ_window_oob) begin // Integrator window out of bounds
-              state <= S_HALTED;
+              state <= S_HALTING;
               status_code <= STS_INTEG_WINDOW_OOB;
-              ps_interrupt <= 1;
             end else if (integ_en_oob) begin // Integrator enable out of bounds
-              state <= S_HALTED;
+              state <= S_HALTING;
               status_code <= STS_INTEG_EN_OOB;
-              ps_interrupt <= 1;
             end else if (sys_en_oob) begin // System enable out of bounds
-              state <= S_HALTED;
+              state <= S_HALTING;
               status_code <= STS_SYS_EN_OOB;
-              ps_interrupt <= 1;
             end else begin // Lock the cfg registers and start the SPI clock to confirm the SPI subsystem is initialized
               state <= S_CONFIRM_SPI_RST;
               timer <= 0;
@@ -186,11 +183,8 @@ module shim_hw_manager #(
             spi_clk_power_n <= 1;
             n_shutdown_force <= 1;
           end else if (timer >= SPI_RESET_WAIT) begin
-            state <= S_HALTED;
-            timer <= 0;
-            spi_clk_power_n <= 1;
+            state <= S_HALTING;
             status_code <= STS_SPI_RESET_TIMEOUT;
-            ps_interrupt <= 1;
           end else begin
             timer <= timer + 1;
           end // if (spi_off)
@@ -215,12 +209,6 @@ module shim_hw_manager #(
 
         // Wait for the SPI subsystem to start before running the system
         // If the SPI subsystem doesn't start in time, halt the system
-        // Signals to halt:
-        //   timer
-        //   n_shutdown_force
-        //   shutdown_sense_en
-        //   spi_clk_power_n
-        //   spi_en
         S_CONFIRM_SPI_START: begin
           if (!spi_off) begin
             state <= S_POWER_ON_AMP_BRD;
@@ -228,12 +216,8 @@ module shim_hw_manager #(
             n_shutdown_rst <= 0;
           end else if (|dac_boot_fail || |adc_boot_fail || timer >= SPI_START_WAIT) begin
             // If the SPI subsystem is still off after the wait, or a channel failed to boot, halt the system
-            state <= S_HALTED;
+            state <= S_HALTING;
             timer <= 0;
-            n_shutdown_force <= 0;
-            shutdown_sense_en <= 0;
-            spi_clk_power_n <= 1;
-            spi_en <= 0;
             // Set the status code based on the error condition
             if (|dac_boot_fail) begin
               status_code <= STS_DAC_BOOT_FAIL;
@@ -243,21 +227,13 @@ module shim_hw_manager #(
               board_num <= extract_board_num(adc_boot_fail);
             end else begin
               status_code <= STS_SPI_START_TIMEOUT;
-            end // if (dac_boot_fail)
-            ps_interrupt <= 1;
+            end
           end else begin
             timer <= timer + 1;
           end // if (!spi_off)
         end // S_CONFIRM_SPI_START
 
         // Pulse the shutdown reset for a short time to power on the power stage
-        // Signals to halt:
-        //   timer
-        //   n_shutdown_force
-        //   n_shutdown_rst
-        //   shutdown_sense_en
-        //   spi_clk_power_n
-        //   spi_en
         S_POWER_ON_AMP_BRD: begin
           if (timer >= SHUTDOWN_RESET_PULSE) begin
             state <= S_AMP_POWER_WAIT;
@@ -270,12 +246,6 @@ module shim_hw_manager #(
 
         // Wait for a delay after pulsing the shutdown reset before starting the system control
         //   (unblocking command/data buffers)
-        // Signals to halt:
-        //   timer
-        //   n_shutdown_force
-        //   shutdown_sense_en
-        //   spi_clk_power_n
-        //   spi_en
         S_AMP_POWER_WAIT: begin
           if (timer >= SHUTDOWN_RESET_DELAY) begin
             state <= S_RUNNING;
@@ -288,12 +258,6 @@ module shim_hw_manager #(
         end // S_AMP_POWER_WAIT
 
         // Main running state, check for various error conditions or shutdowns
-        // Signals to halt:
-        //   n_shutdown_force
-        //   shutdown_sense_en
-        //   spi_clk_power_n
-        //   spi_en
-        //   block_buffers
         S_RUNNING: begin
           // Reset the interrupt before doing anything else
           if (ps_interrupt) begin
@@ -410,15 +374,23 @@ module shim_hw_manager #(
               board_num <= extract_board_num(unexp_adc_trig);
             end
             // Set the status code and halt the system
-            state <= S_HALTED;
-            n_shutdown_force <= 0;
-            shutdown_sense_en <= 0;
-            spi_clk_power_n <= 1;
-            spi_en <= 0;
-            block_buffers <= 1;
-            ps_interrupt <= 1;
+            state <= S_HALTING;
           end // Error/halt state check
         end // S_RUNNING
+
+        // Go to halt the system, set all signals to the initial state and assert the interrupt
+        S_HALTING: begin
+          state <= S_HALTED; // Proceed to halted state
+          timer <= 0;
+          n_shutdown_force <= 0;
+          n_shutdown_rst <= 1;
+          shutdown_sense_en <= 0;
+          unlock_cfg <= 1;
+          spi_clk_power_n <= 1;
+          spi_en <= 0;
+          block_buffers <= 1;
+          ps_interrupt <= 1;
+        end // S_HALTING
 
         // Wait in the halted state until the system enable goes low
         S_HALTED: begin
