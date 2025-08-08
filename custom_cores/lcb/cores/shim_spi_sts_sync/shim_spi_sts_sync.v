@@ -3,8 +3,6 @@
 module shim_spi_sts_sync (
   input  wire        aclk,       // AXI domain clock
   input  wire        aresetn,    // Active low reset signal
-  input  wire        spi_clk,    // SPI domain clock
-  input  wire        spi_resetn, // Active low reset signal for SPI domain
   
   //// Inputs from SPI domain
   // SPI system status
@@ -55,221 +53,151 @@ module shim_spi_sts_sync (
   output wire [7:0]  unexp_adc_trig_sync
 );
 
-  // Default values for registers
-  localparam spi_off_default = 1'b0;
-  localparam [7:0] over_thresh_default = 8'b0;
-  localparam [7:0] thresh_underflow_default = 8'b0;
-  localparam [7:0] thresh_overflow_default = 8'b0;
-  localparam [7:0] bad_trig_cmd_default = 1'b0;
-  localparam [7:0] trig_data_buf_overflow_default = 1'b0;
-  localparam [7:0] dac_boot_fail_default = 8'b0;
-  localparam [7:0] bad_dac_cmd_default = 8'b0;
-  localparam [7:0] dac_cal_oob_default = 8'b0;
-  localparam [7:0] dac_val_oob_default = 8'b0;
-  localparam [7:0] dac_cmd_buf_underflow_default = 8'b0;
-  localparam [7:0] unexp_dac_trig_default = 8'b0;
-  localparam [7:0] adc_boot_fail_default = 8'b0;
-  localparam [7:0] bad_adc_cmd_default = 8'b0;
-  localparam [7:0] adc_cmd_buf_underflow_default = 8'b0;
-  localparam [7:0] adc_data_buf_overflow_default = 8'b0;
-  localparam [7:0] unexp_adc_trig_default = 8'b0;
-
-  //// Synchronize each signal using a sync_coherent module
+  //// Synchronize each signal using a sync_incoherent module
   // SPI system on/off status
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(1)
   ) sync_spi_off (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(spi_off),
-    .dout(spi_off_sync),
-    .dout_default(spi_off_default)
+    .dout(spi_off_sync)
   );
 
   // Integrator threshold status
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_over_thresh (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(over_thresh),
-    .dout(over_thresh_sync),
-    .dout_default(over_thresh_default)
+    .dout(over_thresh_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_thresh_underflow (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(thresh_underflow),
-    .dout(thresh_underflow_sync),
-    .dout_default(thresh_underflow_default)
+    .dout(thresh_underflow_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_thresh_overflow (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(thresh_overflow),
-    .dout(thresh_overflow_sync),
-    .dout_default(thresh_overflow_default)
+    .dout(thresh_overflow_sync)
   );
 
   // Trigger channel status
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(1)
   ) sync_bad_trig_cmd (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(bad_trig_cmd),
-    .dout(bad_trig_cmd_sync),
-    .dout_default(bad_trig_cmd_default)
+    .dout(bad_trig_cmd_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(1)
   ) sync_trig_data_buf_overflow (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(trig_data_buf_overflow),
-    .dout(trig_data_buf_overflow_sync),
-    .dout_default(trig_data_buf_overflow_default)
+    .dout(trig_data_buf_overflow_sync)
   );
 
   // DAC channel status
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_dac_boot_fail (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(dac_boot_fail),
-    .dout(dac_boot_fail_sync),
-    .dout_default(dac_boot_fail_default)
+    .dout(dac_boot_fail_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_bad_dac_cmd (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(bad_dac_cmd),
-    .dout(bad_dac_cmd_sync),
-    .dout_default(bad_dac_cmd_default)
+    .dout(bad_dac_cmd_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_dac_cal_oob (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(dac_cal_oob),
-    .dout(dac_cal_oob_sync),
-    .dout_default(dac_cal_oob_default)
+    .dout(dac_cal_oob_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_dac_val_oob (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(dac_val_oob),
-    .dout(dac_val_oob_sync),
-    .dout_default(dac_val_oob_default)
+    .dout(dac_val_oob_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_dac_cmd_buf_underflow (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(dac_cmd_buf_underflow),
-    .dout(dac_cmd_buf_underflow_sync),
-    .dout_default(dac_cmd_buf_underflow_default)
+    .dout(dac_cmd_buf_underflow_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_unexp_dac_trig (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(unexp_dac_trig),
-    .dout(unexp_dac_trig_sync),
-    .dout_default(unexp_dac_trig_default)
+    .dout(unexp_dac_trig_sync)
   );
 
   // ADC channel status
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_adc_boot_fail (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(adc_boot_fail),
-    .dout(adc_boot_fail_sync),
-    .dout_default(adc_boot_fail_default)
+    .dout(adc_boot_fail_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_bad_adc_cmd (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(bad_adc_cmd),
-    .dout(bad_adc_cmd_sync),
-    .dout_default(bad_adc_cmd_default)
+    .dout(bad_adc_cmd_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_adc_cmd_buf_underflow (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(adc_cmd_buf_underflow),
-    .dout(adc_cmd_buf_underflow_sync),
-    .dout_default(adc_cmd_buf_underflow_default)
+    .dout(adc_cmd_buf_underflow_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_adc_data_buf_overflow (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(adc_data_buf_overflow),
-    .dout(adc_data_buf_overflow_sync),
-    .dout_default(adc_data_buf_overflow_default)
+    .dout(adc_data_buf_overflow_sync)
   );
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(8)
   ) sync_unexp_adc_trig (
-    .in_clk(spi_clk),
-    .in_resetn(spi_resetn),
-    .out_clk(aclk),
-    .out_resetn(aresetn),
+    .clk(aclk),
+    .resetn(aresetn),
     .din(unexp_adc_trig),
-    .dout(unexp_adc_trig_sync),
-    .dout_default(unexp_adc_trig_default)
+    .dout(unexp_adc_trig_sync)
   );
 
 endmodule

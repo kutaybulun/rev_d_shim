@@ -82,11 +82,12 @@ The state machine states are encoded as follows:
 - `4'd5`: `S_POWER_ON_AMP_BRD` - Pulses `n_shutdown_rst` low for `SHUTDOWN_RESET_PULSE`, then sets it high again.
 - `4'd6`: `S_AMP_POWER_WAIT` - Waits for `SHUTDOWN_RESET_DELAY` after pulsing shutdown reset, then unblocks command/data buffers and asserts `ps_interrupt`.
 - `4'd7`: `S_RUNNING` - Normal operation. Continuously monitors for halt conditions. If any error or shutdown condition occurs, transitions to `S_HALTED`, disables outputs, and asserts `ps_interrupt`.
-- `4'd8`: `S_HALTED` - Waits for `sys_en` to go low, then returns to `S_IDLE` and clears status.
+- `4'd8`: `S_HALTING` - Prepares to halt the system. Takes one cycle to set all signals to the initial state and assert `ps_interrupt`.
+- `4'd9`: `S_HALTED` - Halted state. All outputs are disabled, and the system waits for a reset or `sys_en` to go low.
 
 ### Halt/Error Conditions
 
-The system transitions to `S_HALTED` and sets the appropriate status code if any of the following occur:
+The system transitions through `S_HALTING` to `S_HALTED` and sets the appropriate status code if any of the following occur:
 - `sys_en` goes low (processing system shutdown)
 - Configuration lock violation (`lock_viol`)
 - Shutdown detected via `shutdown_sense` or `ext_shutdown`
@@ -111,8 +112,8 @@ Status codes are 25 bits wide and include:
 
 - `25'h0001`: `STS_OK` - System is operating normally.
 - `25'h0002`: `STS_PS_SHUTDOWN` - Processing system shutdown.
-- `25'h0100`: `STS_SPI_START_TIMEOUT` - SPI start timeout.
-- `25'h0101`: `STS_SPI_RESET_TIMEOUT` - SPI initialization timeout.
+- `25'h0100`: `STS_SPI_RESET_TIMEOUT` - SPI initialization timeout.
+- `25'h0101`: `STS_SPI_START_TIMEOUT` - SPI start timeout.
 - `25'h0200`: `STS_INTEG_THRESH_AVG_OOB` - Integrator threshold average out of bounds.
 - `25'h0201`: `STS_INTEG_WINDOW_OOB` - Integrator window out of bounds.
 - `25'h0202`: `STS_INTEG_EN_OOB` - Integrator enable register out of bounds.

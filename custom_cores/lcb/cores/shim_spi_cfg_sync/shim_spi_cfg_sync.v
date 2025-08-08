@@ -60,41 +60,32 @@ module shim_spi_cfg_sync (
     .dout(integ_window_sync),
     .dout_default(integ_window_default)
   );
-
-  sync_coherent #(
+  
+  sync_incoherent #(
     .WIDTH(1)
   ) sync_integ_en (
-    .in_clk(aclk),
-    .in_resetn(aresetn),
-    .out_clk(spi_clk),
-    .out_resetn(spi_resetn),
+    .clk(spi_clk),
+    .resetn(spi_resetn),
     .din(integ_en),
-    .dout(integ_en_sync),
-    .dout_default(integ_en_default)
+    .dout(integ_en_sync)
   );
 
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(1)
   ) sync_spi_en (
-    .in_clk(aclk),
-    .in_resetn(aresetn),
-    .out_clk(spi_clk),
-    .out_resetn(spi_resetn),
+    .clk(spi_clk),
+    .resetn(spi_resetn),
     .din(spi_en),
-    .dout(spi_en_sync),
-    .dout_default(spi_en_default)
+    .dout(spi_en_sync)
   );
 
-  sync_coherent #(
+  sync_incoherent #(
     .WIDTH(1)
   ) sync_block_buffers (
-    .in_clk(aclk),
-    .in_resetn(aresetn),
-    .out_clk(spi_clk),
-    .out_resetn(spi_resetn),
+    .clk(spi_clk),
+    .resetn(spi_resetn),
     .din(block_buffers),
-    .dout(block_buffers_sync),
-    .dout_default(block_buffers_default)
+    .dout(block_buffers_sync)
   );
   
 endmodule

@@ -19,7 +19,8 @@ class shim_hw_manager_base:
         5: "S_POWER_ON_AMP_BRD",
         6: "S_AMP_POWER_WAIT",
         7: "S_RUNNING",
-        8: "S_HALTED"
+        8: "S_HALTING",
+        9: "S_HALTED"
     }
     
     # Status codes dictionary
@@ -27,8 +28,8 @@ class shim_hw_manager_base:
         0x0000: "STS_EMPTY",
         0x0001: "STS_OK",
         0x0002: "STS_PS_SHUTDOWN",
-        0x0100: "STS_SPI_START_TIMEOUT",
-        0x0101: "STS_SPI_RESET_TIMEOUT",
+        0x0100: "STS_SPI_RESET_TIMEOUT",
+        0x0101: "STS_SPI_START_TIMEOUT",
         0x0200: "STS_INTEG_THRESH_AVG_OOB",
         0x0201: "STS_INTEG_WINDOW_OOB",
         0x0202: "STS_INTEG_EN_OOB",

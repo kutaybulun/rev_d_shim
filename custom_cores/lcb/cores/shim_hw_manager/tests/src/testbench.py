@@ -83,6 +83,7 @@ async def test_configuration_errors(dut):
         tb.dut._log.info(f"sys_en = {dut.sys_en.value}, {status_name} = {error_signal.value}")
         await tb.check_state_and_status(1, 1)  # S_IDLE = 1, STS_OK = 1
 
+        await tb.wait_for_state(tb.get_state_value("S_HALTING"))
         await tb.wait_for_state(tb.get_state_value("S_HALTED"))
         tb.dut._log.info(f"sys_en = {dut.sys_en.value}, {status_name} = {error_signal.value}")
         await tb.check_state_and_status(tb.get_state_value("S_HALTED"), expected_status)  # Check that we are in S_HALTED state with the expected status
@@ -170,6 +171,9 @@ async def test_halted_to_idle(dut):
     dut.lock_viol.value = 1
     await RisingEdge(dut.clk) # where the error is detected
     await RisingEdge(dut.clk) # where the state is updated
+    # Check that the system is in S_HALTING state
+    await tb.check_state_and_status(tb.get_state_value("S_HALTING"), tb.get_status_value("STS_LOCK_VIOL"))
+    await RisingEdge(dut.clk) # where the state is updated
     # Check that the system is in S_HALTED state
     await tb.check_state_and_status(tb.get_state_value("S_HALTED"), tb.get_status_value("STS_LOCK_VIOL"))
     assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
@@ -233,8 +237,11 @@ async def test_runtime_errors(dut):
             error_signal.value = 1
 
         await RisingEdge(dut.clk) # where the error is detected
-        await RisingEdge(dut.clk) # where the state is updated
 
+        await RisingEdge(dut.clk) # where the state is updated
+        # Check that we are in S_HALTING state
+        await tb.check_state_and_status(tb.get_state_value("S_HALTING"), expected_status)
+        await RisingEdge(dut.clk) # where the state is updated
         # Check that we are in S_HALTED state
         await tb.check_state_and_status(tb.get_state_value("S_HALTED"), expected_status)
 
@@ -288,9 +295,12 @@ async def test_per_board_errors(dut):
         error_signal.value = 1 << i
 
         await RisingEdge(dut.clk) # where the error is detected
-        await RisingEdge(dut.clk) # where the state is updated
 
         expected_status = tb.get_status_value(status_name)
+        await RisingEdge(dut.clk) # where the state is updated
+        # Check that we are in S_HALTING state with correct board_num
+        await tb.check_state_and_status(tb.get_state_value("S_HALTING"), expected_status, expected_board_num=i)
+        await RisingEdge(dut.clk) # where the state is updated
         # Check that we are in S_HALTED state with correct board_num
         await tb.check_state_and_status(tb.get_state_value("S_HALTED"), expected_status, expected_board_num=i)
 
@@ -326,8 +336,10 @@ async def test_spi_reset_timeout(dut):
     tb.dut._log.info(f"Simulating SPI reset timeout, waiting for {tb.SPI_RESET_WAIT} cycles")
     await tb.wait_cycles(tb.SPI_RESET_WAIT)
     tb.dut._log.info(f"timer value is {int(dut.timer.value)}, maximum wait time was {tb.SPI_RESET_WAIT}")
-    await RisingEdge(dut.clk)
 
+    await RisingEdge(dut.clk)
+    await tb.check_state_and_status(tb.get_state_value("S_HALTING"), tb.get_status_value("STS_SPI_RESET_TIMEOUT"))
+    await RisingEdge(dut.clk)
     await tb.check_state_and_status(tb.get_state_value("S_HALTED"), tb.get_status_value("STS_SPI_RESET_TIMEOUT"))
     assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
     assert dut.shutdown_sense_en.value == 0, "Expected shutdown sense disabled"
@@ -366,8 +378,10 @@ async def test_spi_start_timeout(dut):
     tb.dut._log.info(f"Simulating SPI start timeout, waiting for {tb.SPI_START_WAIT} cycles")
     await tb.wait_cycles(tb.SPI_START_WAIT)
     tb.dut._log.info(f"timer value is {int(dut.timer.value)}, maximum wait time was {tb.SPI_START_WAIT}")
-    await RisingEdge(dut.clk)
 
+    await RisingEdge(dut.clk)
+    await tb.check_state_and_status(tb.get_state_value("S_HALTING"), tb.get_status_value("STS_SPI_START_TIMEOUT"))
+    await RisingEdge(dut.clk)
     await tb.check_state_and_status(tb.get_state_value("S_HALTED"), tb.get_status_value("STS_SPI_START_TIMEOUT"))
     assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
     assert dut.shutdown_sense_en.value == 0, "Expected shutdown sense disabled"
@@ -389,8 +403,10 @@ async def test_extract_board_number(dut):
     for i in range(8):
         dut.over_thresh.value = 1 << i
         await RisingEdge(dut.clk)
-        await RisingEdge(dut.clk)
 
+        await RisingEdge(dut.clk)
+        await tb.check_state(tb.get_state_value("S_HALTING"))
+        await RisingEdge(dut.clk)
         await tb.check_state(tb.get_state_value("S_HALTED"))
         tb.dut._log.info(f"Checking board number {i}, got {int(dut.board_num.value)}")
         assert dut.board_num.value == i, f"Expected board number {i}, got {int(dut.board_num.value)}"
@@ -411,8 +427,10 @@ async def test_extract_board_num_multiple_bits(dut):
     # Set multiple bits (e.g., bits 0, 2, 4, 5)
     dut.over_thresh.value = 0b00110101
     await RisingEdge(dut.clk)
-    await RisingEdge(dut.clk)
 
     # Should halt and extract the lowest bit (bit 0)
+    await RisingEdge(dut.clk)
+    await tb.check_state(tb.get_state_value("S_HALTING"))
+    await RisingEdge(dut.clk)
     await tb.check_state(tb.get_state_value("S_HALTED"))
     assert dut.board_num.value == 0, f"Expected board number 0 (lowest set bit), got {int(dut.board_num.value)}"

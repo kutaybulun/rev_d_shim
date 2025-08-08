@@ -1,5 +1,5 @@
 ## Variably define the channel count (MUST BE 1 TO 8 INCLUSIVE)
-set board_count 2
+set board_count 1
 
 # If the board count is not 8, then error out
 if {$board_count < 1 || $board_count > 8} {
@@ -8,7 +8,7 @@ if {$board_count < 1 || $board_count > 8} {
 }
 
 ## Variably choose whether to use an external clock
-set use_ext_clk 1
+set use_ext_clk 0
 
 # If the external clock is not 0 or 1, then error out
 if {$use_ext_clk != 0 && $use_ext_clk != 1} {
@@ -129,8 +129,7 @@ cell xilinx.com:ip:xlconstant:1.1 const_1 {
 # Pullup for UART1 RX
 # Enable I2C0 on the correct MIO pins
 # Set FCLK0 to 100 MHz
-# Set FCLK1 to 10 MHz
-# Turn off FCLK2-3 and reset1-3
+# Turn off FCLK1-3 and reset1-3
 init_ps ps {
   PCW_USE_M_AXI_GP0 1
   PCW_USE_M_AXI_GP1 1
@@ -142,7 +141,7 @@ init_ps ps {
   PCW_I2C0_PERIPHERAL_ENABLE 1
   PCW_I2C0_I2C0_IO {MIO 38 .. 39}
   PCW_FPGA0_PERIPHERAL_FREQMHZ 100
-  PCW_FPGA1_PERIPHERAL_FREQMHZ 10
+  PCW_EN_CLK1_PORT 0
   PCW_EN_CLK2_PORT 0
   PCW_EN_CLK3_PORT 0
   PCW_EN_RST1_PORT 0
@@ -233,34 +232,47 @@ cell lcb:user:shim_shutdown_sense shutdown_sense {} {
 ###############################################################################
 
 ### SPI clock control
-# MMCM (handles down to 10 MHz input)
-# Includes power down and dynamic reconfiguration
-# Safe clock startup prevents clock output when not locked
-cell xilinx.com:ip:clk_wiz:6.0 spi_clk {
-  PRIMITIVE MMCM
-  USE_POWER_DOWN true
-  USE_DYN_RECONFIG true
-  USE_SAFE_CLOCK_STARTUP true
-  PRIM_IN_FREQ 10
-  CLKOUT1_REQUESTED_OUT_FREQ 50.000
-  FEEDBACK_SOURCE FDBK_AUTO
-  CLKOUT1_DRIVES BUFGCE
-} {
-  s_axi_aclk ps/FCLK_CLK0
-  s_axi_aresetn ps_rst/peripheral_aresetn
-  s_axi_lite sys_cfg_axi_intercon/M03_AXI
-  power_down hw_manager/spi_clk_power_n
+if {$use_ext_clk} {
+  # MMCM (handles down to 10 MHz input)
+  # Includes power down and dynamic reconfiguration
+  # Safe clock startup prevents clock output when not locked
+  cell xilinx.com:ip:clk_wiz:6.0 spi_clk {
+    PRIMITIVE MMCM
+    USE_DYN_RECONFIG true
+    USE_SAFE_CLOCK_STARTUP true
+    PRIM_IN_FREQ 10
+    CLKOUT1_REQUESTED_OUT_FREQ 50.000
+    FEEDBACK_SOURCE FDBK_AUTO
+    CLKOUT1_DRIVES BUFGCE
+  } {
+    s_axi_aclk ps/FCLK_CLK0
+    s_axi_aresetn ps_rst/peripheral_aresetn
+    s_axi_lite sys_cfg_axi_intercon/M03_AXI
+    clk_in1 Scanner_10Mhz_In
+  }
+} else {
+  # Use FCLK_CLK0 as the clock input
+  # (Vivado gives 99999893 Hz as the actual generated frequency)
+  cell xilinx.com:ip:clk_wiz:6.0 spi_clk {
+    PRIMITIVE MMCM
+    USE_DYN_RECONFIG true
+    USE_SAFE_CLOCK_STARTUP true
+    PRIM_IN_FREQ 99.999893
+    CLKOUT1_REQUESTED_OUT_FREQ 50.000
+    FEEDBACK_SOURCE FDBK_AUTO
+    CLKOUT1_DRIVES BUFGCE
+  } {
+    s_axi_aclk ps/FCLK_CLK0
+    s_axi_aresetn ps_rst/peripheral_aresetn
+    s_axi_lite sys_cfg_axi_intercon/M03_AXI
+    clk_in1 ps/FCLK_CLK0
+  }
 }
 addr 0x40200000 2048 spi_clk/s_axi_lite ps/M_AXI_GP0
 
 ## SPI clock input
 # If use_ext_clk is 1, then use the external clock input
 # otherwise use the 10MHz FCLK_CLK1 
-if {$use_ext_clk} {
-  wire spi_clk/clk_in1 Scanner_10Mhz_In
-} else {
-  wire spi_clk/clk_in1 ps/FCLK_CLK1
-}
   
 
 ###############################################################################
@@ -363,21 +375,38 @@ addr 0x40100000 128 status_reg/S_AXI ps/M_AXI_GP0
 # (127+96*(n-1)) : (96+96*(n-1)) -- 32b ADC ch(n) data FIFO status word    (n=1..8)
 #            831 : 800           -- 32b Trigger command FIFO status word
 #            863 : 832           -- 32b Trigger data FIFO status word
-#           1023 : 864           -- 160b reserved bits
-## Pad reserved bits
-cell xilinx.com:ip:xlconstant:1.1 pad_160 {
-  CONST_VAL 0
-  CONST_WIDTH 160
-} {}
-# Status register concatenation
-# Concatenate: hw_manager/status_word, pad_32, then for each i=1..8: dac_cmd_fifo_${i}/fifo_sts_word, adc_cmd_fifo_${i}/fifo_sts_word, adc_data_fifo_${i}/fifo_sts_word, then pad_448
+#            895 : 864           -- 32b Debug 1 (see below)
+#           1023 : 896           -- 128b reserved bits (4x32b)
 cell xilinx.com:ip:xlconcat:2.1 sts_concat {
-  NUM_PORTS 3
+  NUM_PORTS 7
 } {
   In0 hw_manager/status_word
   In1 axi_spi_interface/fifo_sts
-  In2 pad_160/dout
   dout status_reg/sts_data
+}
+# Debug 1 tracks the following:
+# 0: SPI clock locked
+# 1: `spi_off` signal
+cell xilinx.com:ip:xlconcat:2.1 debug_1 {
+  NUM_PORTS 3
+} {
+  In0 spi_clk/locked
+  In1 hw_manager/spi_off
+  dout sts_concat/In2
+}
+cell xilinx.com:ip:xlconstant:1.1 pad_30 {
+  CONST_VAL 0
+  CONST_WIDTH 30
+} {
+  dout debug_1/In2
+}
+# Pad reserved bits
+cell xilinx.com:ip:xlconstant:1.1 pad_32 {
+  CONST_VAL 0
+  CONST_WIDTH 32
+} {}
+for {set i 3} {$i < 7} {incr i} {
+  wire sts_concat/In${i} pad_32/dout
 }
 
 ### Alert status register (tracking FIFO unavailability)
@@ -402,6 +431,13 @@ cell xilinx.com:ip:xlconcat:2.1 irq_concat {
 
 ###############################################################################
 
+### Gate the SPI clock output
+cell lcb:user:clk_gate spi_clk_gate {} {
+  clk spi_clk/clk_out1
+  en hw_manager/spi_clk_gate
+}
+  
+
 ### Create I/O buffers for differential signals
 module io_buffers io_buffers {
   ldac spi_clk_domain/ldac
@@ -412,7 +448,7 @@ module io_buffers io_buffers {
   adc_mosi spi_clk_domain/adc_mosi
   adc_miso spi_clk_domain/adc_miso
   miso_sck spi_clk_domain/miso_sck
-  n_mosi_sck spi_clk/clk_out1
+  n_mosi_sck spi_clk_gate/clk_gated
   ldac_p LDAC_p
   ldac_n LDAC_n
   n_dac_cs_p n_DAC_CS_p

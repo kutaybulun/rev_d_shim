@@ -12,7 +12,8 @@ STATE_BIN_LABELS = {
     5: "S_POWER_ON_AMP_BRD",
     6: "S_AMP_POWER_WAIT",
     7: "S_RUNNING",
-    8: "S_HALTED"
+    8: "S_HALTING",
+    9: "S_HALTED"
 }
 
 STATUS_BIN_LABELS = {
