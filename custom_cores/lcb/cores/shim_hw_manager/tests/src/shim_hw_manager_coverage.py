@@ -89,8 +89,8 @@ def sample_state_and_status_coverage(dut):
             bins = [True, False],
             rel = lambda x, y: x == y,
             at_least = 1)
-@CoverPoint("shim_hw_manager.spi_clk_power_n",
-            xf = lambda dut: int(dut.spi_clk_power_n.value),
+@CoverPoint("shim_hw_manager.spi_clk_gate",
+            xf = lambda dut: int(dut.spi_clk_gate.value),
             bins = [True, False],
             rel = lambda x, y: x == y,
             at_least = 1)

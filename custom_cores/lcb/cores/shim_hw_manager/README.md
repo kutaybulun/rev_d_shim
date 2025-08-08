@@ -59,7 +59,7 @@ The `shim_hw_manager` module manages the hardware system's startup, operation, a
 
 - **System Control**
   - `unlock_cfg`: Lock configuration.
-  - `spi_clk_power_n`: SPI clock power (negated).
+  - `spi_clk_gate`: SPI clock gate.
   - `spi_en`: SPI subsystem enable.
   - `shutdown_sense_en`: Shutdown sense enable.
   - `block_buffers`: Block command/data buffers (active high).
@@ -76,7 +76,7 @@ The `shim_hw_manager` module manages the hardware system's startup, operation, a
 
 The state machine states are encoded as follows:
 - `4'd1`: `S_IDLE` - Waits for `sys_en` to go high. Checks for out-of-bounds configuration values. If any OOB condition is detected, transitions to `S_HALTED` with the corresponding status code and asserts `ps_interrupt`. If all checks pass, locks configuration and powers up the SPI clock.
-- `4'd2`: `S_CONFIRM_SPI_RST` - Waits for the SPI subsystem to be powered off (`spi_off`). If not powered off within `SPI_RESET_WAIT`, transitions to `S_HALTED` with a timeout status.
+- `4'd2`: `S_CONFIRM_SPI_RST` - Makes sure the SPI system is powered off (`spi_off`). If not powered off within `SPI_RESET_WAIT`, transitions to `S_HALTED` with a timeout status.
 - `4'd3`: `S_POWER_ON_CRTL_BRD` - Releases shutdown force (`n_shutdown_force` high) and waits for `SHUTDOWN_FORCE_DELAY`.
 - `4'd4`: `S_CONFIRM_SPI_START` - Enables shutdown sense, SPI clock, and SPI subsystem, then waits for the SPI subsystem to start (`spi_off` deasserted). If not started within `SPI_START_WAIT` or if any DAC/ADC boot failure occurs, transitions to `S_HALTED` with the appropriate status code.
 - `4'd5`: `S_POWER_ON_AMP_BRD` - Pulses `n_shutdown_rst` low for `SHUTDOWN_RESET_PULSE`, then sets it high again.

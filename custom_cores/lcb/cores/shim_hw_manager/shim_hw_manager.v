@@ -64,7 +64,7 @@ module shim_hw_manager #(
 
   // Internal signals
   reg [ 3:0] state;       // State machine state
-  reg [63:0] timer;       // Timer for various timeouts
+  reg [31:0] timer;       // Timer for various timeouts
   reg [ 2:0] board_num;   // Status - Board number (if applicable)
   reg [24:0] status_code; // Status - Status code
 

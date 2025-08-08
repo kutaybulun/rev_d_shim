@@ -178,7 +178,7 @@ async def test_halted_to_idle(dut):
     await tb.check_state_and_status(tb.get_state_value("S_HALTED"), tb.get_status_value("STS_LOCK_VIOL"))
     assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
     assert dut.shutdown_sense_en.value == 0, "Expected shutdown sense disabled"
-    assert dut.spi_clk_power_n.value == 1, "Expected SPI clock power disabled"
+    assert dut.spi_clk_gate.value == 0, "Expected SPI clock gate disabled"
     assert dut.spi_en.value == 0, "Expected SPI disabled"
     assert dut.block_buffers.value == 1, "Expected buffers to be blocked"
     assert dut.ps_interrupt.value == 1, "Expected interrupt asserted"
@@ -247,7 +247,7 @@ async def test_runtime_errors(dut):
 
         assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
         assert dut.shutdown_sense_en.value == 0, "Expected shutdown sense disabled"
-        assert dut.spi_clk_power_n.value == 1, "Expected SPI clock power disabled"
+        assert dut.spi_clk_gate.value == 0, "Expected SPI clock gate disabled"
         assert dut.spi_en.value == 0, "Expected SPI disabled"
         assert dut.block_buffers.value == 1, "Expected buffers to be blocked"
         assert dut.ps_interrupt.value == 1, "Expected interrupt asserted"
@@ -306,7 +306,7 @@ async def test_per_board_errors(dut):
 
         assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
         assert dut.shutdown_sense_en.value == 0, "Expected shutdown sense disabled"
-        assert dut.spi_clk_power_n.value == 1, "Expected SPI clock power disabled"
+        assert dut.spi_clk_gate.value == 0, "Expected SPI clock gate disabled"
         assert dut.spi_en.value == 0, "Expected SPI disabled"
         assert dut.block_buffers.value == 1, "Expected buffers to be blocked"
         assert dut.ps_interrupt.value == 1, "Expected interrupt asserted"
@@ -343,7 +343,7 @@ async def test_spi_reset_timeout(dut):
     await tb.check_state_and_status(tb.get_state_value("S_HALTED"), tb.get_status_value("STS_SPI_RESET_TIMEOUT"))
     assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
     assert dut.shutdown_sense_en.value == 0, "Expected shutdown sense disabled"
-    assert dut.spi_clk_power_n.value == 1, "Expected SPI clock power disabled"
+    assert dut.spi_clk_gate.value == 0, "Expected SPI clock gate disabled"
     assert dut.spi_en.value == 0, "Expected SPI disabled"
     assert dut.block_buffers.value == 1, "Expected buffers to be blocked"
     assert dut.ps_interrupt.value == 1, "Expected interrupt asserted"
@@ -385,7 +385,7 @@ async def test_spi_start_timeout(dut):
     await tb.check_state_and_status(tb.get_state_value("S_HALTED"), tb.get_status_value("STS_SPI_START_TIMEOUT"))
     assert dut.n_shutdown_force.value == 0, "Expected shutdown force"
     assert dut.shutdown_sense_en.value == 0, "Expected shutdown sense disabled"
-    assert dut.spi_clk_power_n.value == 1, "Expected SPI clock power off"
+    assert dut.spi_clk_gate.value == 0, "Expected SPI clock gate disabled"
     assert dut.spi_en.value == 0, "Expected SPI disabled"
     assert dut.ps_interrupt.value == 1, "Expected interrupt asserted"
 
