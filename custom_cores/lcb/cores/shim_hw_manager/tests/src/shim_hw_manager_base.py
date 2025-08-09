@@ -194,7 +194,7 @@ class shim_hw_manager_base:
             self.dut._log.info(f"Board: {status_info['board_num']}")
         self.dut._log.info(f"------------ OUTPUT SIGNALS AT TIME = {time}  ------------")
         self.dut._log.info(f"  unlock_cfg: {self.dut.unlock_cfg.value}")
-        self.dut._log.info(f"  spi_clk_power_n: {self.dut.spi_clk_power_n.value}")
+        self.dut._log.info(f"  spi_clk_gate: {self.dut.spi_clk_gate.value}")
         self.dut._log.info(f"  spi_en: {self.dut.spi_en.value}")
         self.dut._log.info(f"  shutdown_sense_en: {self.dut.shutdown_sense_en.value}")
         self.dut._log.info(f"  block_buffers: {self.dut.block_buffers.value}")

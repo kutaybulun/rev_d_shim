@@ -10,9 +10,9 @@ module clock_gate (
 //         7 Series
 
 BUFGCE BUFGCE_inst (
-   .I(clk)        // 1-bit input: Primary clock
+   .I(clk),       // 1-bit input: Primary clock
    .CE(en),       // 1-bit input: Clock enable input for I0
-   .O(clk_gated), // 1-bit output: Clock output
+   .O(clk_gated)  // 1-bit output: Clock output
 );
 
 endmodule

@@ -310,8 +310,8 @@ projects/${PROJECT}/tests/core_tests_summary: $(addprefix custom_cores/, $(addsu
 	@./scripts/make/status.sh "MAKING TEST SUMMARY FOR PROJECT: $(PROJECT)"
 	mkdir -p $(@D)
 	echo "Test summary of custom cores for project $(PROJECT) on $$(date +"%Y/%m/%d at %H:%M %Z"):" > $@
-	echo "" >> $@
-	for core in $(PROJECT_CORES); do \
+	@echo "" >> $@
+	@for core in $(PROJECT_CORES); do \
 		VENDOR=$$(echo $$core | cut -d'/' -f1); \
 		CORE=$$(echo $$core | cut -d'/' -f2); \
 		TEST_CERT=custom_cores/$$VENDOR/cores/$$CORE/tests/test_status; \
