@@ -158,7 +158,7 @@ class sync_coherent_base:
                 num_expected_data_read += 1
                 actual_data = int(self.dut.dout.value)
                 self.dut._log.info(f"Expected data: {expected_data}, Actual data: {actual_data}")
-                self.dut._log.info(f"Data queue: {list(self.expected_data_q)}")
+                self.dut._log.info(f"Expected data queue: {list(self.expected_data_q)}")
                 assert actual_data == expected_data, f"Data mismatch: expected {expected_data}, got {actual_data}"
 
             if num_expected_data_read == self.num_expected_data:
