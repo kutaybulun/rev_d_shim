@@ -18,7 +18,8 @@ module shim_axi_sys_ctrl #
 
   // Configuration outputs
   output wire                sys_en,
-  output reg  [25:0]         buffer_reset,
+  output reg  [16:0]         command_buffer_reset,
+  output reg  [16:0]         data_buffer_reset,
   output reg  [14:0]         integ_thresh_avg,
   output reg  [31:0]         integ_window,
   output reg                 integ_en,
@@ -27,7 +28,8 @@ module shim_axi_sys_ctrl #
 
   // Configuration bounds
   output wire  sys_en_oob,
-  output wire  buffer_reset_oob,
+  output wire  command_buffer_reset_oob,
+  output wire  data_buffer_reset_oob,
   output wire  integ_thresh_avg_oob,
   output wire  integ_window_oob,
   output wire  integ_en_oob,
@@ -61,16 +63,18 @@ module shim_axi_sys_ctrl #
 
   // Localparams for bit offsets
   localparam integer SYS_EN_32_OFFSET                       = 0;
-  localparam integer BUFFER_RESET_32_OFFSET                 = 1;
-  localparam integer INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET = 2;
-  localparam integer INTEGRATOR_WINDOW_32_OFFSET            = 3;
-  localparam integer INTEGRATOR_EN_32_OFFSET                = 4;
-  localparam integer BOOT_TEST_SKIP_32_OFFSET               = 5;
-  localparam integer BOOT_TEST_DEBUG_32_OFFSET              = 6;
+  localparam integer COMMAND_BUFFER_RESET_32_OFFSET         = 1;
+  localparam integer DATA_BUFFER_RESET_32_OFFSET            = 2;
+  localparam integer INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET = 3;
+  localparam integer INTEGRATOR_WINDOW_32_OFFSET            = 4;
+  localparam integer INTEGRATOR_EN_32_OFFSET                = 5;
+  localparam integer BOOT_TEST_SKIP_32_OFFSET               = 6;
+  localparam integer BOOT_TEST_DEBUG_32_OFFSET              = 7;
 
   // Localparams for widths
   localparam integer SYS_EN_WIDTH = 1;
-  localparam integer BUFFER_RESET_WIDTH = 26;
+  localparam integer COMMAND_BUFFER_RESET_WIDTH = 17;
+  localparam integer DATA_BUFFER_RESET_WIDTH = 17;
   localparam integer INTEGRATOR_THRESHOLD_AVERAGE_WIDTH = 15;
   localparam integer INTEGRATOR_WINDOW_WIDTH = 32;
   localparam integer INTEGRATOR_EN_WIDTH = 1;
@@ -79,7 +83,8 @@ module shim_axi_sys_ctrl #
 
   // Localparams for MIN/MAX values
   localparam integer SYS_EN_MAX                       = {{SYS_EN_WIDTH{1'b1}}};
-  localparam integer BUFFER_RESET_MAX                 = {{BUFFER_RESET_WIDTH{1'b1}}};
+  localparam integer COMMAND_BUFFER_RESET_MAX         = {{COMMAND_BUFFER_RESET_WIDTH{1'b1}}};
+  localparam integer DATA_BUFFER_RESET_MAX            = {{DATA_BUFFER_RESET_WIDTH{1'b1}}};
   localparam integer INTEGRATOR_THRESHOLD_AVERAGE_MIN = {{(INTEGRATOR_THRESHOLD_AVERAGE_WIDTH-1){1'b0}}, 1'b1}; // Minimum is 1
   localparam integer INTEGRATOR_THRESHOLD_AVERAGE_MAX = {{INTEGRATOR_THRESHOLD_AVERAGE_WIDTH{1'b1}}};
   localparam integer INTEGRATOR_WINDOW_MIN            = 2048;
@@ -170,7 +175,8 @@ module shim_axi_sys_ctrl #
   // Initial values (shifted)
   assign int_data_wire = int_axi_data_wire | (~int_data_modified_wire & int_initial_data_wire);
   assign int_initial_data_wire[SYS_EN_32_OFFSET*32+SYS_EN_WIDTH-1:SYS_EN_32_OFFSET*32] = {SYS_EN_WIDTH{1'b0}}; // System enable defaults to 0
-  assign int_initial_data_wire[BUFFER_RESET_32_OFFSET*32+BUFFER_RESET_WIDTH-1-:BUFFER_RESET_WIDTH] = {BUFFER_RESET_WIDTH{1'b0}}; // Buffer reset defaults to 0 (but !aresetn will override them to 1)
+  assign int_initial_data_wire[COMMAND_BUFFER_RESET_32_OFFSET*32+COMMAND_BUFFER_RESET_WIDTH-1-:COMMAND_BUFFER_RESET_WIDTH] = {COMMAND_BUFFER_RESET_WIDTH{1'b0}}; // Command buffer reset defaults to 0
+  assign int_initial_data_wire[DATA_BUFFER_RESET_32_OFFSET*32+DATA_BUFFER_RESET_WIDTH-1-:DATA_BUFFER_RESET_WIDTH] = {DATA_BUFFER_RESET_WIDTH{1'b0}}; // Data buffer reset defaults to 0
   assign int_initial_data_wire[INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET*32+INTEGRATOR_THRESHOLD_AVERAGE_WIDTH-1-:INTEGRATOR_THRESHOLD_AVERAGE_WIDTH] = INTEGRATOR_THRESHOLD_AVERAGE_DEFAULT_CAPPED[INTEGRATOR_THRESHOLD_AVERAGE_WIDTH-1:0];
   assign int_initial_data_wire[INTEGRATOR_WINDOW_32_OFFSET*32+INTEGRATOR_WINDOW_WIDTH-1-:INTEGRATOR_WINDOW_WIDTH] = INTEGRATOR_WINDOW_DEFAULT_CAPPED[INTEGRATOR_WINDOW_WIDTH-1:0];
   assign int_initial_data_wire[INTEGRATOR_EN_32_OFFSET*32+INTEGRATOR_EN_WIDTH-1:INTEGRATOR_EN_32_OFFSET*32] = INTEGRATOR_EN_DEFAULT_CAPPED[INTEGRATOR_EN_WIDTH-1:0];
@@ -179,7 +185,8 @@ module shim_axi_sys_ctrl #
 
   // Out of bounds checks. Use the whole word for the check to error on truncation
   assign sys_en_oob = $unsigned(int_data_wire[SYS_EN_32_OFFSET*32+SYS_EN_WIDTH-1:SYS_EN_32_OFFSET*32]) > SYS_EN_MAX;
-  assign buffer_reset_oob = $unsigned(int_data_wire[BUFFER_RESET_32_OFFSET*32+BUFFER_RESET_WIDTH-1:BUFFER_RESET_32_OFFSET*32]) > BUFFER_RESET_MAX;
+  assign command_buffer_reset_oob = $unsigned(int_data_wire[COMMAND_BUFFER_RESET_32_OFFSET*32+COMMAND_BUFFER_RESET_WIDTH-1:COMMAND_BUFFER_RESET_32_OFFSET*32]) > COMMAND_BUFFER_RESET_MAX;
+  assign data_buffer_reset_oob = $unsigned(int_data_wire[DATA_BUFFER_RESET_32_OFFSET*32+DATA_BUFFER_RESET_WIDTH-1:DATA_BUFFER_RESET_32_OFFSET*32]) > DATA_BUFFER_RESET_MAX;
   assign integ_thresh_avg_oob = $unsigned(int_data_wire[INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET*32+INTEGRATOR_THRESHOLD_AVERAGE_WIDTH-1-:INTEGRATOR_THRESHOLD_AVERAGE_WIDTH]) < $unsigned(INTEGRATOR_THRESHOLD_AVERAGE_MIN) 
                              || $unsigned(int_data_wire[INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET*32+INTEGRATOR_THRESHOLD_AVERAGE_WIDTH-1-:INTEGRATOR_THRESHOLD_AVERAGE_WIDTH]) > $unsigned(INTEGRATOR_THRESHOLD_AVERAGE_MAX)
                              || $unsigned(int_data_wire[INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET*32+INTEGRATOR_THRESHOLD_AVERAGE_WIDTH-1-:INTEGRATOR_THRESHOLD_AVERAGE_WIDTH]) > $unsigned(32767);
@@ -193,7 +200,8 @@ module shim_axi_sys_ctrl #
   // Send SLVERR if there are any violations
   assign int_bresp_wire = 
     (s_axi_awaddr[ADDR_LSB+CFG_WIDTH-1:ADDR_LSB] == SYS_EN_32_OFFSET) ? (sys_en_oob ? 2'b10 : 2'b00) :
-    (s_axi_awaddr[ADDR_LSB+CFG_WIDTH-1:ADDR_LSB] == BUFFER_RESET_32_OFFSET) ? (buffer_reset_oob ? 2'b10 : 2'b00) :
+    (s_axi_awaddr[ADDR_LSB+CFG_WIDTH-1:ADDR_LSB] == COMMAND_BUFFER_RESET_32_OFFSET) ? (command_buffer_reset_oob ? 2'b10 : 2'b00) :
+    (s_axi_awaddr[ADDR_LSB+CFG_WIDTH-1:ADDR_LSB] == DATA_BUFFER_RESET_32_OFFSET) ? (data_buffer_reset_oob ? 2'b10 : 2'b00) :
     (s_axi_awaddr[ADDR_LSB+CFG_WIDTH-1:ADDR_LSB] == INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET) ? ((locked || integ_thresh_avg_oob) ? 2'b10 : 2'b00) :
     (s_axi_awaddr[ADDR_LSB+CFG_WIDTH-1:ADDR_LSB] == INTEGRATOR_WINDOW_32_OFFSET) ? ((locked || integ_window_oob) ? 2'b10 : 2'b00) :
     (s_axi_awaddr[ADDR_LSB+CFG_WIDTH-1:ADDR_LSB] == INTEGRATOR_EN_32_OFFSET) ? ((locked || integ_en_oob) ? 2'b10 : 2'b00) :
@@ -204,7 +212,7 @@ module shim_axi_sys_ctrl #
   assign sys_en = int_data_wire[SYS_EN_32_OFFSET*32];
 
   // Lock violation wire
-  // sys_en and buffer_reset are not locked, so they are not checked
+  // sys_en, command_buffer_reset, and data_buffer_reset are not locked, so they are not checked
   assign int_lock_viol_wire = 
             integ_thresh_avg != int_data_wire[INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET*32+INTEGRATOR_THRESHOLD_AVERAGE_WIDTH-1:INTEGRATOR_THRESHOLD_AVERAGE_32_OFFSET*32]
             || integ_window != int_data_wire[INTEGRATOR_WINDOW_32_OFFSET*32+INTEGRATOR_WINDOW_WIDTH-1:INTEGRATOR_WINDOW_32_OFFSET*32]
@@ -221,7 +229,8 @@ module shim_axi_sys_ctrl #
       int_rvalid_reg <= 1'b0;
       int_rdata_reg <= {(AXI_DATA_WIDTH){1'b0}};
 
-      buffer_reset <= {BUFFER_RESET_WIDTH{1'b1}}; // Buffer reset is high if reset is asserted, but defaults to 0 otherwise
+      command_buffer_reset <= {COMMAND_BUFFER_RESET_WIDTH{1'b1}}; // Command buffer reset is high if reset is asserted, but defaults to 0 otherwise
+      data_buffer_reset <= {DATA_BUFFER_RESET_WIDTH{1'b1}}; // Data buffer reset is high if reset is asserted, but defaults to 0 otherwise
       integ_thresh_avg <= INTEGRATOR_THRESHOLD_AVERAGE_DEFAULT_CAPPED;
       integ_window <= INTEGRATOR_WINDOW_DEFAULT_CAPPED;
       integ_en <= INTEGRATOR_EN_DEFAULT_CAPPED;
@@ -238,7 +247,8 @@ module shim_axi_sys_ctrl #
       int_rdata_reg <= int_rdata_next;
 
       // Buffers are a register even though they're not locked to allow the reset value to be different than the default
-      buffer_reset <= int_data_wire[BUFFER_RESET_32_OFFSET*32+BUFFER_RESET_WIDTH-1:BUFFER_RESET_32_OFFSET*32];
+      command_buffer_reset <= int_data_wire[COMMAND_BUFFER_RESET_32_OFFSET*32+COMMAND_BUFFER_RESET_WIDTH-1:COMMAND_BUFFER_RESET_32_OFFSET*32];
+      data_buffer_reset <= int_data_wire[DATA_BUFFER_RESET_32_OFFSET*32+DATA_BUFFER_RESET_WIDTH-1:DATA_BUFFER_RESET_32_OFFSET*32];
 
       // Lock other registers if sys_en is set
       if(sys_en) begin

@@ -17,14 +17,15 @@ module shim_hw_manager #(
   input   wire          spi_off,      // SPI system powered off
   input   wire          ext_shutdown, // External shutdown
   // Pre-start configuration values
-  input   wire          lock_viol,            // Configuration lock violation
-  input   wire          sys_en_oob,           // System enable register out of bounds
-  input   wire          buffer_reset_oob,     // Buffer reset out of bounds
-  input   wire          integ_thresh_avg_oob, // Integrator threshold average out of bounds
-  input   wire          integ_window_oob,     // Integrator window out of bounds
-  input   wire          integ_en_oob,         // Integrator enable register out of bounds
-  input   wire          boot_test_skip_oob,   // Boot test skip out of bounds
-  input   wire          boot_test_debug_oob,  // Boot test debug out of bounds
+  input   wire          lock_viol,                // Configuration lock violation
+  input   wire          sys_en_oob,               // System enable register out of bounds
+  input   wire          command_buffer_reset_oob, // Command buffer reset out of bounds
+  input   wire          data_buffer_reset_oob,    // Data buffer reset out of bounds
+  input   wire          integ_thresh_avg_oob,     // Integrator threshold average out of bounds
+  input   wire          integ_window_oob,         // Integrator window out of bounds
+  input   wire          integ_en_oob,             // Integrator enable register out of bounds
+  input   wire          boot_test_skip_oob,       // Boot test skip out of bounds
+  input   wire          boot_test_debug_oob,      // Boot test debug out of bounds
   // Shutdown sense (per board)
   input   wire  [ 7:0]  shutdown_sense, // Shutdown sense
   // Integrator (per board)
@@ -37,13 +38,15 @@ module shim_hw_manager #(
   input   wire          trig_data_buf_underflow, // Trigger data buffer underflow
   input   wire          trig_data_buf_overflow,  // Trigger data buffer overflow
   // DAC buffers and commands (per board)
-  input   wire  [ 7:0]  dac_boot_fail,         // DAC boot failure
-  input   wire  [ 7:0]  bad_dac_cmd,           // Bad DAC command
-  input   wire  [ 7:0]  dac_cal_oob,           // DAC calibration out of bounds
-  input   wire  [ 7:0]  dac_val_oob,           // DAC value out of bounds
-  input   wire  [ 7:0]  dac_cmd_buf_underflow, // DAC command buffer underflow
-  input   wire  [ 7:0]  dac_cmd_buf_overflow,  // DAC command buffer overflow
-  input   wire  [ 7:0]  unexp_dac_trig,        // Unexpected DAC trigger
+  input   wire  [ 7:0]  dac_boot_fail,          // DAC boot failure
+  input   wire  [ 7:0]  bad_dac_cmd,            // Bad DAC command
+  input   wire  [ 7:0]  dac_cal_oob,            // DAC calibration out of bounds
+  input   wire  [ 7:0]  dac_val_oob,            // DAC value out of bounds
+  input   wire  [ 7:0]  dac_cmd_buf_underflow,  // DAC command buffer underflow
+  input   wire  [ 7:0]  dac_cmd_buf_overflow,   // DAC command buffer overflow
+  input   wire  [ 7:0]  dac_data_buf_underflow, // DAC data buffer underflow
+  input   wire  [ 7:0]  dac_data_buf_overflow,  // DAC data buffer overflow
+  input   wire  [ 7:0]  unexp_dac_trig,         // Unexpected DAC trigger
   // ADC buffers and commands (per board)
   input   wire  [ 7:0]  adc_boot_fail,          // ADC boot failure
   input   wire  [ 7:0]  bad_adc_cmd,            // Bad ADC command
@@ -96,12 +99,13 @@ module shim_hw_manager #(
   // Pre-start configuration values
   localparam  STS_LOCK_VIOL               = 25'h0200,
               STS_SYS_EN_OOB              = 25'h0201,
-              STS_BUFFER_RESET_OOB        = 25'h0202,
-              STS_INTEG_THRESH_AVG_OOB    = 25'h0203,
-              STS_INTEG_WINDOW_OOB        = 25'h0204,
-              STS_INTEG_EN_OOB            = 25'h0205,
-              STS_BOOT_TEST_SKIP_OOB      = 25'h0206,
-              STS_BOOT_TEST_DEBUG_OOB     = 25'h0207;
+              STS_CMD_BUFFER_RESET_OOB    = 25'h0202,
+              STS_DATA_BUFFER_RESET_OOB   = 25'h0203,
+              STS_INTEG_THRESH_AVG_OOB    = 25'h0204,
+              STS_INTEG_WINDOW_OOB        = 25'h0205,
+              STS_INTEG_EN_OOB            = 25'h0206,
+              STS_BOOT_TEST_SKIP_OOB      = 25'h0207,
+              STS_BOOT_TEST_DEBUG_OOB     = 25'h0208;
   // Shutdown sense
   localparam  STS_SHUTDOWN_SENSE          = 25'h0300,
               STS_EXT_SHUTDOWN            = 25'h0301;
@@ -119,9 +123,11 @@ module shim_hw_manager #(
               STS_BAD_DAC_CMD             = 25'h0601,
               STS_DAC_CAL_OOB             = 25'h0602,
               STS_DAC_VAL_OOB             = 25'h0603,
-              STS_DAC_BUF_UNDERFLOW       = 25'h0604,
-              STS_DAC_BUF_OVERFLOW        = 25'h0605,
-              STS_UNEXP_DAC_TRIG          = 25'h0606;
+              STS_DAC_CMD_BUF_UNDERFLOW   = 25'h0604,
+              STS_DAC_CMD_BUF_OVERFLOW    = 25'h0605,
+              STS_DAC_DATA_BUF_UNDERFLOW  = 25'h0606,
+              STS_DAC_DATA_BUF_OVERFLOW   = 25'h0607,
+              STS_UNEXP_DAC_TRIG          = 25'h0608;
   // ADC buffers and commands
   localparam  STS_ADC_BOOT_FAIL           = 25'h0700,
               STS_BAD_ADC_CMD             = 25'h0701,
@@ -159,9 +165,12 @@ module shim_hw_manager #(
             if (sys_en_oob) begin // System enable out of bounds
               state <= S_HALTING;
               status_code <= STS_SYS_EN_OOB;
-            end else if (buffer_reset_oob) begin // Buffer reset out of bounds
+            end else if (command_buffer_reset_oob) begin // Command buffer reset out of bounds
               state <= S_HALTING;
-              status_code <= STS_BUFFER_RESET_OOB;
+              status_code <= STS_CMD_BUFFER_RESET_OOB;
+            end else if (data_buffer_reset_oob) begin // Data buffer reset out of bounds
+              state <= S_HALTING;
+              status_code <= STS_DATA_BUFFER_RESET_OOB;
             end else if (integ_thresh_avg_oob) begin // Integrator threshold average out of bounds
               state <= S_HALTING;
               status_code <= STS_INTEG_THRESH_AVG_OOB;
@@ -295,6 +304,8 @@ module shim_hw_manager #(
               || |dac_val_oob
               || |dac_cmd_buf_underflow
               || |dac_cmd_buf_overflow
+              || |dac_data_buf_underflow
+              || |dac_data_buf_overflow
               || |unexp_dac_trig
               // ADC buffers and commands
               || |bad_adc_cmd
@@ -347,12 +358,20 @@ module shim_hw_manager #(
               board_num <= extract_board_num(dac_val_oob);
             end
             else if (|dac_cmd_buf_underflow) begin
-              status_code <= STS_DAC_BUF_UNDERFLOW;
+              status_code <= STS_DAC_CMD_BUF_UNDERFLOW;
               board_num <= extract_board_num(dac_cmd_buf_underflow);
             end
             else if (|dac_cmd_buf_overflow) begin
-              status_code <= STS_DAC_BUF_OVERFLOW;
+              status_code <= STS_DAC_CMD_BUF_OVERFLOW;
               board_num <= extract_board_num(dac_cmd_buf_overflow);
+            end
+            else if (|dac_data_buf_underflow) begin
+              status_code <= STS_DAC_DATA_BUF_UNDERFLOW;
+              board_num <= extract_board_num(dac_data_buf_underflow);
+            end
+            else if (|dac_data_buf_overflow) begin
+              status_code <= STS_DAC_DATA_BUF_OVERFLOW;
+              board_num <= extract_board_num(dac_data_buf_overflow);
             end
             else if (|unexp_dac_trig) begin
               status_code <= STS_UNEXP_DAC_TRIG;

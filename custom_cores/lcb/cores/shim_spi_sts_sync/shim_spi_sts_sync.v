@@ -20,6 +20,7 @@ module shim_spi_sts_sync (
   input  wire [7:0]  dac_cal_oob,
   input  wire [7:0]  dac_val_oob,
   input  wire [7:0]  dac_cmd_buf_underflow,
+  input  wire [7:0]  dac_data_buf_overflow,
   input  wire [7:0]  unexp_dac_trig,
   // ADC channel status
   input  wire [7:0]  adc_boot_fail,
@@ -44,6 +45,7 @@ module shim_spi_sts_sync (
   output wire [7:0]  dac_cal_oob_sync,
   output wire [7:0]  dac_val_oob_sync,
   output wire [7:0]  dac_cmd_buf_underflow_sync,
+  output wire [7:0]  dac_data_buf_overflow_sync,
   output wire [7:0]  unexp_dac_trig_sync,
   // ADC channel status
   output wire [7:0]  adc_boot_fail_sync,
@@ -148,6 +150,14 @@ module shim_spi_sts_sync (
     .resetn(aresetn),
     .din(dac_cmd_buf_underflow),
     .dout(dac_cmd_buf_underflow_sync)
+  );
+  sync_incoherent #(
+    .WIDTH(8)
+  ) sync_dac_data_buf_overflow (
+    .clk(aclk),
+    .resetn(aresetn),
+    .din(dac_data_buf_overflow),
+    .dout(dac_data_buf_overflow_sync)
   );
   sync_incoherent #(
     .WIDTH(8)

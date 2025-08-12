@@ -15,12 +15,17 @@ module shim_ad5676_dac_ctrl #(
   input  wire [31:0] cmd_word,
   input  wire        cmd_buf_empty,
 
+  output reg         data_word_wr_en,
+  output reg  [31:0] data_word,
+  input  wire        data_buf_full,
+
   input  wire        trigger,
   input  wire        ldac_shared,
   output wire        waiting_for_trig,
 
   output reg         boot_fail,
   output reg         cmd_buf_underflow,
+  output reg         data_buf_overflow,
   output reg         unexp_trig,
   output reg         bad_cmd,
   output reg         cal_oob,
@@ -138,6 +143,7 @@ module shim_ad5676_dac_ctrl #(
   wire        n_miso_data_ready_mosi_clk; // Indicate whether the MISO data is ready to be read in MOSI clock domain
   wire [15:0] miso_data_mosi_clk; // MISO data in MOSI clock domain
   wire        boot_readback_match; // Indicate whether the readback matches the expected value
+  wire        try_data_write; // Try to write data to the output buffer
 
 
   //// State machine transitions
@@ -223,6 +229,7 @@ module shim_ad5676_dac_ctrl #(
                  || (state == S_DAC_WR && ldac_shared) // Unexpected LDAC assertion
                  || (next_cmd && next_cmd_state == S_ERROR) // Bad command
                  || (((cmd_done && expect_next) || read_next_dac_val_pair) && cmd_buf_empty) // Command buffer underflow
+                 || (try_data_write && data_buf_full) // Data buffer overflow
                  || cal_oob // Calibration value out of bounds
                  || dac_val_oob; // DAC value out of bounds
   // Boot check fail
@@ -246,6 +253,11 @@ module shim_ad5676_dac_ctrl #(
   always @(posedge clk) begin
     if (!resetn) cmd_buf_underflow <= 1'b0;
     else if (((cmd_done && expect_next) || read_next_dac_val_pair) && cmd_buf_empty) cmd_buf_underflow <= 1'b1; // Underflow if expecting buffer item but buffer is empty
+  end
+  // Data buffer overflow
+  always @(posedge clk) begin
+    if (!resetn) data_buf_overflow <= 1'b0;
+    else if (try_data_write && data_buf_full) data_buf_overflow <= 1'b1;
   end
   // DAC val out of bounds
   always @(posedge clk) begin
@@ -475,6 +487,22 @@ module shim_ad5676_dac_ctrl #(
     if (!miso_resetn) miso_buf_wr_en <= 1'b0; // Reset MISO buffer write enable on reset
     else if (miso_bit == 1) miso_buf_wr_en <= 1'b1; // Write MISO data to FIFO when last bit is received
     else miso_buf_wr_en <= 1'b0;
+  end
+
+  // DAC data output
+  // If in S_TEST_RD state and MISO data is ready, output the readback data if in debug mode
+  assign try_data_write = (state == S_TEST_RD && ~n_miso_data_ready_mosi_clk && boot_test_debug) // In debug mode, output readback data
+  // DAC data output write enable
+  // Write MISO data to the data buffer when attempting a write and buffer isn't full
+  always @(posedge clk) begin
+    if (!resetn || state == S_ERROR) data_word_wr_en <= 1'b0; // Reset data word write enable on reset or error
+    else if (try_data_write && !data_buf_full) data_word_wr_en <= 1'b1; // Write data word when two words are ready and buffer isn't full
+    else data_word_wr_en <= 1'b0;
+  end
+  // MISO data word
+  always @(posedge clk) begin
+    if (!resetn || state == S_ERROR) data_word <= 32'd0; // Reset data word on reset or error
+    else if (try_data_write && !data_buf_full) data_word <= {16'd0, miso_data_mosi_clk};
   end
 
   //// Functions for conversions

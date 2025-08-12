@@ -390,9 +390,11 @@ module shim_ads816x_adc_ctrl #(
 
   // ADC data output
   // When two data words are ready (one stored, one just read), try to write them to the data buffer
-  assign try_data_write = !n_miso_data_ready_mosi_clk && miso_stored;
+  // Alternatively, if in S_TEST_RD state and boot_test_debug is enabled, write the read value to the data buffer
+  assign try_data_write = (!n_miso_data_ready_mosi_clk && miso_stored)
+                          || (state == S_TEST_RD && ~n_miso_data_ready_mosi_clk && boot_test_debug);
   // ADC data output write enable
-  // Write MISO data to the data buffer when two words are ready and buffer isn't full
+  // Write MISO data to the data buffer when attempting a write and buffer isn't full
   always @(posedge clk) begin
     if (!resetn || state == S_ERROR) data_word_wr_en <= 1'b0; // Reset data word write enable on reset or error
     else if (try_data_write && !data_buf_full) data_word_wr_en <= 1'b1; // Write data word when two words are ready and buffer isn't full
@@ -421,7 +423,7 @@ module shim_ads816x_adc_ctrl #(
     end else if (boot_test_debug) begin
       // If debug is enabled, write the S_TEST_RD read value to the data buffer
       if (state == S_TEST_RD && ~n_miso_data_ready_mosi_clk) begin
-        data_word <= {miso_data_mosi_clk[15:0], 16'd0}; // Write the read value to the data buffer
+        data_word <= {16'd0, miso_data_mosi_clk[15:0]}; // Write the read value to the data buffer
       end
     end
   end

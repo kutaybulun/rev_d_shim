@@ -1,14 +1,15 @@
-**Updated 2025-08-08**
+**Updated 2025-08-12**
 # AD5676 DAC Control Core
 
-The `shim_ad5676_dac_ctrl` module controls the AD5676 DAC in the Rev D shim firmware via a command buffer. It manages SPI communication, command sequencing, calibration, error handling, and synchronization for the 8 DAC channels on the AD5676.
+The `shim_ad5676_dac_ctrl` module manages the AD5676 DAC in the Rev D shim firmware. It handles SPI communication, command sequencing, calibration, error detection, and synchronization for all 8 DAC channels.
 
 ## Inputs and Outputs
 
 ### Inputs
 
 - `clk`, `resetn`: Main clock and active-low reset.
-- `boot_test_skip`: If set, skips the boot-time DAC test sequence and immediately sets up the core.
+- `boot_test_skip`: Skips boot-time DAC test and sets up the core immediately.
+- `boot_test_debug`: Enables debug output during boot test.
 - `cmd_word [31:0]`: Command word from buffer.
 - `cmd_buf_empty`: Indicates if command buffer is empty.
 - `trigger`: External trigger signal.
@@ -19,8 +20,9 @@ The `shim_ad5676_dac_ctrl` module controls the AD5676 DAC in the Rev D shim firm
 
 - `setup_done`: Indicates successful boot and setup (set immediately if `boot_test_skip` is asserted).
 - `cmd_word_rd_en`: Enables reading the next command word.
+- `data_word_wr_en`, `data_word [31:0]`: Output data word and write enable (for debug readback).
 - `waiting_for_trig`: Indicates waiting for trigger.
-- `boot_fail`, `cmd_buf_underflow`, `unexp_trig`, `bad_cmd`, `cal_oob`, `dac_val_oob`: Error flags.
+- Error flags: `boot_fail`, `cmd_buf_underflow`, `data_buf_overflow`, `unexp_trig`, `bad_cmd`, `cal_oob`, `dac_val_oob`.
 - `abs_dac_val_concat [119:0]`: Concatenated absolute DAC values.
 - `n_cs`: SPI chip select (active low).
 - `mosi`: SPI MOSI data.
@@ -30,8 +32,8 @@ The `shim_ad5676_dac_ctrl` module controls the AD5676 DAC in the Rev D shim firm
 
 ### Command Types
 
-- **NO_OP (`2'b00`):** Take no actions. Used for just a delay or trigger wait.
-- **DAC_WR (`2'b01`):** Write DAC values.
+- **NO_OP (`2'b00`):** Delay or trigger wait, optional LDAC pulse.
+- **DAC_WR (`2'b01`):** Write DAC values (4 words, 2 channels each).
 - **SET_CAL (`2'b10`):** Set calibration value for a channel.
 - **CANCEL (`2'b11`):** Cancel current wait or delay.
 
@@ -40,45 +42,23 @@ The `shim_ad5676_dac_ctrl` module controls the AD5676 DAC in the Rev D shim firm
 `[31:30]` - Command code (2 bits).
 
 #### NO_OP Command (`2'b00`)
-- `[29]` - TRIGGER WAIT: If set, waits at the end of the command for an external trigger. Otherwise, waits until delay timer expires.
-- `[28]` - CONTINUE: If set, expects the next command to be immediately available after the current command completes (trigger or delay).
-- `[27]` - LDAC: If set, pulses LDAC at the end of the command.
-- `[26]` - Unused.
-- `[25:0]` - Delay timer: Used for delay timer (in clock cycles) if TRIGGER WAIT is not set.
-
-This command will not perform SPI actions. It will wait for the specified delay or trigger, and if LDAC is set, it will pulse LDAC at the end of the command. Otherwise, it can be used for a delay or trigger synchronization block.
+- `[29]` - TRIGGER WAIT: Waits for external trigger if set, otherwise uses delay timer.
+- `[28]` - CONTINUE: Expects next command immediately after current completes.
+- `[27]` - LDAC: Pulses LDAC at end of command if set.
+- `[25:0]` - Delay timer (clock cycles, used if TRIGGER WAIT is not set).
 
 #### DAC_WR Command (`2'b01`)
-- `[29]` - TRIGGER WAIT: If set, waits at the end of the command for an external trigger. Otherwise, waits until delay timer expires.
-- `[28]` - CONTINUE: If set, expects the next command to be immediately available after the current command completes (trigger or delay).
-- `[27]` - LDAC: If set, pulses LDAC at the end of the command.
-- `[26]` - Unused.
-- `[25:0]` - Delay timer: Used for delay timer (in clock cycles) if TRIGGER WAIT is not set.
-
-After the command is processed, the core expects 4 incoming 32-bit words, each containing the DAC values for a pair of channels. The incoming words are packed as follows:
-- `[15:0]` - First channel value
-- `[31:16]` - Second channel value
-
-The words are processed in pairs, with each word corresponding to two channels:
-
-- Word 1: Channels 0 and 1
-- Word 2: Channels 2 and 3
-- Word 3: Channels 4 and 5
-- Word 4: Channels 6 and 7
-
-The command will end following a delay or trigger AFTER processing all 4 words, and the core will pulse LDAC if the LDAC flag is set when the command completes.
+- Same bit structure as NO_OP for trigger, continue, LDAC, and delay.
+- After command, expects 4 words (each `[31:16]` = channel N+1, `[15:0]` = channel N).
+- Channels are updated in pairs: (0,1), (2,3), (4,5), (6,7).
+- LDAC is pulsed after all channels are updated if LDAC flag is set.
 
 #### SET_CAL Command (`2'b10`)
-- `[29:19]` - Unused
-- `[18:16]` - Channel index (0-7)
-- `[15:0]`  - Signed calibration value for the specified channel (range: -32768 to 32767, capped by `ABS_CAL_MAX` parameter).
-
-This command sets the calibration value for a specific channel. The calibration value is applied to the DAC value when loaded in from the command buffer. If the calibration value is out of bounds relative to the `ABS_CAL_MAX` parameter, the `cal_oob` error flag is set. If the addition of the calibration value to the DAC value results in an out-of-bounds value, the `dac_val_oob` error flag is set.
+- `[18:16]` - Channel index (0-7).
+- `[15:0]`  - Signed calibration value (range: -`ABS_CAL_MAX` to `ABS_CAL_MAX`).
 
 #### CANCEL Command (`2'b11`)
-- `[29:0]` - Unused
-
-If the current state is waiting for a trigger or delay, if the next command is a CANCEL command, the core will immediately exit the wait state and return to IDLE. From the user side, it's recommended to clear the command buffer before issuing a CANCEL command in order to cancel immediately, as the core will only cancel once the CANCEL command is at the end of the buffer.
+- Cancels current wait state (trigger or delay) and returns to IDLE.
 
 ### State Machine
 
@@ -93,21 +73,22 @@ If the current state is waiting for a trigger or delay, if the next command is a
 
 - Per-channel signed calibration, bounded by `ABS_CAL_MAX`.
 - Calibration values are applied to DAC updates.
+- Out-of-bounds calibration or DAC values set error flags.
 
 ### Error Handling
 
 - Boot readback mismatch.
 - Unexpected triggers or LDAC assertion.
 - Invalid commands.
-- Buffer underflow.
+- Buffer underflow/overflow.
 - Out-of-bounds calibration or DAC values.
 
 ## Notes
 
-- SPI timing and chip select are managed to meet AD5676 requirements.
-- All conversions between offset and signed values are handled internally.
-- Uses asynchronous FIFO and synchronizer modules for safe cross-domain data transfer.
-- The `boot_test_skip` input allows skipping the boot-time DAC test for faster startup or testing scenarios.
+- SPI timing and chip select meet AD5676 requirements.
+- Offset/signed conversions handled internally.
+- Asynchronous FIFO and synchronizer modules ensure safe cross-domain data transfer.
+- `boot_test_skip` input allows skipping boot-time DAC test for faster startup or testing.
 
 ## References
 
