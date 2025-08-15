@@ -345,15 +345,20 @@ module shim_ads816x_adc_ctrl #(
   assign mosi = mosi_shift_reg[23];
   // MOSI shift register
   always @(posedge clk) begin
+    // Reset MOSI shift register on reset or error
     if (!resetn || state == S_ERROR) mosi_shift_reg <= 24'd0;
-    else if (spi_bit > 0 || running_spi_bit) mosi_shift_reg <= {mosi_shift_reg[22:0], 1'b0}; // Shift out bits
-    else if (state == S_INIT) begin // If just exiting reset:
-      // Load the shift register with the command to set On-the-Fly mode
+    // Shift out bits when spi_bit is nonzero
+    else if (spi_bit > 0) mosi_shift_reg <= {mosi_shift_reg[22:0], 1'b0};
+    // If just exiting reset, load the shift register with the command to set On-the-Fly mode
+    else if (state == S_INIT) begin
       mosi_shift_reg <= spi_reg_write_cmd(ADDR_OTF_CFG, SET_OTF_CFG_DATA);
+    // Read back the On-the-Fly mode register
     end else if (state == S_TEST_WR && adc_spi_cmd_done) begin
-      mosi_shift_reg <= spi_reg_read_cmd(ADDR_OTF_CFG); // Read back the On-the-Fly mode register
+      mosi_shift_reg <= spi_reg_read_cmd(ADDR_OTF_CFG); 
+    // No-op during the word when reading back the On-the-Fly mode register
     end else if (state == S_REQ_RD && adc_spi_cmd_done) begin
-      mosi_shift_reg <= 24'd0; // No-op during the word when reading back the On-the-Fly mode register
+      mosi_shift_reg <= 24'd0; 
+    // Load the shift register with the next ADC word command
     end else if ((next_cmd && (next_cmd_state == S_ADC_RD))
                  || ((state == S_ADC_RD) && adc_spi_cmd_done)) begin
       if (adc_word_idx < 8) mosi_shift_reg <= {spi_req_otf_sample_cmd(adc_word_idx[2:0]), 8'd0};

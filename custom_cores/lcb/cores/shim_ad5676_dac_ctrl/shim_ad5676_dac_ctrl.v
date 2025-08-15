@@ -449,18 +449,23 @@ module shim_ad5676_dac_ctrl #(
   assign mosi = mosi_shift_reg[47]; // MOSI is the most significant bit of the shift register
   // SPI MOSI shift register
   always @(posedge clk) begin
-    if (!resetn || state == S_ERROR) mosi_shift_reg <= 48'd0; // Reset shift register on reset or error
-    else if (spi_bit > 0 || running_spi_bit) mosi_shift_reg <= {mosi_shift_reg[46:0], 1'b0}; // Shift bits out
-    else if (state == S_INIT) begin // If just exiting reset:
-      // Load the shift register with the test value for boot-up sequence
-      mosi_shift_reg <= {spi_write_cmd(DAC_TEST_CH, DAC_TEST_VAL), 24'h000000}; // Load test value for test channel
-    end else if (state == S_TEST_WR && dac_spi_cmd_done) begin // If finished with the test write:
-      // Load the shift register with the read request and a write to reset the test value
-      mosi_shift_reg <= {spi_read_cmd(DAC_TEST_CH), spi_write_cmd(DAC_TEST_CH, 16'h7FFF)}; // Read test channel and write midrange to reset test value
+    // Reset shift register on reset or error
+    if (!resetn || state == S_ERROR) mosi_shift_reg <= 48'd0; 
+     // Shift bits out
+    else if (spi_bit > 0) mosi_shift_reg <= {mosi_shift_reg[46:0], 1'b0};
+    // If just exiting reset load the shift register with the test value for boot-up sequence
+    else if (state == S_INIT) begin
+      mosi_shift_reg <= {spi_write_cmd(DAC_TEST_CH, DAC_TEST_VAL), 24'h000000};
+    // If finished with the test write, load the shift register with two commands: the read request and a write to reset the test value
+    end else if (state == S_TEST_WR && dac_spi_cmd_done) begin
+      mosi_shift_reg <= {spi_read_cmd(DAC_TEST_CH), spi_write_cmd(DAC_TEST_CH, 16'h7FFF)};
+    // Load the shift register with the first DAC value and the second DAC value
     end else if (state == S_DAC_WR && dac_load_stage == DAC_LOAD_STAGE_CONV) begin
-      // Load the shift register with the first DAC value and the second DAC value
       mosi_shift_reg <= {spi_write_cmd(dac_channel, signed_to_offset(first_dac_val_cal_signed)), 
                         spi_write_cmd(dac_channel + 1, signed_to_offset(second_dac_val_cal_signed))};
+    // Shift once more when transitioning between words (when shift register is loaded with two 24-bit words)
+    end else if (running_spi_bit) begin 
+       mosi_shift_reg <= {mosi_shift_reg[46:0], 1'b0};
     end
   end
   // Start MISO read in MOSI clock domain
