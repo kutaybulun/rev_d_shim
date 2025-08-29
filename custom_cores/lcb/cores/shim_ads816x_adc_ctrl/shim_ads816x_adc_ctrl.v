@@ -392,7 +392,10 @@ module shim_ads816x_adc_ctrl #(
   always @(posedge clk) begin
     if (!resetn || state == S_ERROR) adc_word_idx <= 4'd0;
     else if (next_cmd && command == CMD_ADC_RD) adc_word_idx <= 4'd0;
-    else if (state == S_ADC_RD && adc_spi_cmd_done && !last_adc_word) adc_word_idx <= adc_word_idx + 1;
+    else if (state == S_ADC_RD && adc_spi_cmd_done) begin
+      if (!last_adc_word) adc_word_idx <= adc_word_idx + 1;
+      else adc_word_idx <= 4'd0;
+    end
   end
 
 
@@ -448,8 +451,8 @@ module shim_ads816x_adc_ctrl #(
     // Load the shift register with the next ADC word command
     end else if ((next_cmd && (next_cmd_state == S_ADC_RD))
                  || ((state == S_ADC_RD) && adc_spi_cmd_done)) begin
-      if (adc_word_idx < 8) mosi_shift_reg <= {spi_req_otf_sample_cmd(sample_order[adc_word_idx[2:0]]), 8'd0};
-      else if (adc_word_idx == 8) mosi_shift_reg <= {spi_req_otf_sample_cmd(3'b0), 8'd0};
+      if (!last_adc_word) mosi_shift_reg <= {spi_req_otf_sample_cmd(sample_order[adc_word_idx[2:0]]), 8'd0};
+      else if (last_adc_word) mosi_shift_reg <= {spi_req_otf_sample_cmd(3'b0), 8'd0};
     end
   end
   // Start MISO read in MOSI clock domain
