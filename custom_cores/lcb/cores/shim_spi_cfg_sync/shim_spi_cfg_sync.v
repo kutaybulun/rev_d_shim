@@ -12,6 +12,8 @@ module shim_spi_cfg_sync (
   input  wire [14:0] integ_thresh_avg,
   input  wire [31:0] integ_window,
   input  wire        integ_en,
+  input  wire [ 4:0] dac_n_cs_high_time,
+  input  wire [ 7:0] adc_n_cs_high_time,
   input  wire [15:0] boot_test_skip,
   input  wire [15:0] debug,
 
@@ -21,6 +23,8 @@ module shim_spi_cfg_sync (
   output wire [14:0] integ_thresh_avg_sync,
   output wire [31:0] integ_window_sync,
   output wire        integ_en_sync,
+  output wire [ 4:0] dac_n_cs_high_time_sync,
+  output wire [ 7:0] adc_n_cs_high_time_sync,
   output wire [15:0] boot_test_skip_sync,
   output wire [15:0] debug_sync
 );
@@ -28,6 +32,8 @@ module shim_spi_cfg_sync (
   // Default values for registers
   localparam [14:0] integ_thresh_avg_default = 15'h1000;
   localparam [31:0] integ_window_default = 32'h00010000;
+  localparam [ 4:0] dac_n_cs_high_time_default = 5'd31; // Max value
+  localparam [ 7:0] adc_n_cs_high_time_default = 8'd255; // Max value
 
   // Synchronize each signal
   // Use sync_coherent for multi-bit data,
@@ -35,7 +41,8 @@ module shim_spi_cfg_sync (
 
   // SPI enable (incoherent)
   sync_incoherent #(
-    .WIDTH(1)
+    .WIDTH(1),
+    .DEPTH(5) // Use deeper synchronizer to give extra delay for this signal
   ) sync_spi_en (
     .clk(spi_clk),
     .resetn(spi_resetn),
@@ -87,6 +94,32 @@ module shim_spi_cfg_sync (
     .din(integ_window),
     .dout(integ_window_sync),
     .dout_default(integ_window_default)
+  );
+
+  // DAC n_cs_high_time (coherent)
+  sync_coherent #(
+    .WIDTH(5)
+  ) sync_dac_n_cs_high_time (
+    .in_clk(aclk),
+    .in_resetn(aresetn),
+    .out_clk(spi_clk),
+    .out_resetn(spi_resetn),
+    .din(dac_n_cs_high_time),
+    .dout(dac_n_cs_high_time_sync),
+    .dout_default(dac_n_cs_high_time_default)
+  );
+
+  // ADC n_cs_high_time (coherent)
+  sync_coherent #(
+    .WIDTH(8)
+  ) sync_adc_n_cs_high_time (
+    .in_clk(aclk),
+    .in_resetn(aresetn),
+    .out_clk(spi_clk),
+    .out_resetn(spi_resetn),
+    .din(adc_n_cs_high_time),
+    .dout(adc_n_cs_high_time_sync),
+    .dout_default(adc_n_cs_high_time_default)
   );
 
   // Boot test skip (incoherent)

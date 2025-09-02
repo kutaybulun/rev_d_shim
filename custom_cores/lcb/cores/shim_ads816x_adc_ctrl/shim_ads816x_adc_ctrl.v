@@ -1,11 +1,12 @@
-module shim_ads816x_adc_ctrl #(
-  parameter ADS_MODEL_ID = 8 // 8 for ADS8168, 7 for ADS8167, 6 for ADS8166
-)(
+`timescale 1ns / 1ps
+
+module shim_ads816x_adc_ctrl (
   input  wire        clk,
   input  wire        resetn,
 
   input  wire        boot_test_skip, // Skip the boot test sequence
   input  wire        debug, // Debug mode flag
+  input  wire [7:0]  n_cs_high_time, // n_cs high time in clock cycles (max 255)
 
   output reg         setup_done,
 
@@ -38,46 +39,8 @@ module shim_ads816x_adc_ctrl #(
   // Timing Parameters
   ///////////////////////////////////////////////////////////////////////////////
 
-  // SPI clock frequency (Hz)
-  localparam integer SPI_CLK_HZ = 20_000_000;
-
-  // Conversion and cycle times (ns) for each ADC model
-  localparam integer T_CONV_NS_ADS8168  = 660;
-  localparam integer T_CONV_NS_ADS8167  = 1200;
-  localparam integer T_CONV_NS_ADS8166  = 2500;
-  localparam integer T_CYCLE_NS_ADS8168 = 1000;
-  localparam integer T_CYCLE_NS_ADS8167 = 2000;
-  localparam integer T_CYCLE_NS_ADS8166 = 4000;
-
-  // Select conversion and cycle times based on ADS_MODEL_ID
-  localparam integer t_conv_ns =
-    (ADS_MODEL_ID == 8) ? T_CONV_NS_ADS8168 :
-    (ADS_MODEL_ID == 7) ? T_CONV_NS_ADS8167 :
-    (ADS_MODEL_ID == 6) ? T_CONV_NS_ADS8166 :
-    T_CONV_NS_ADS8166;
-
-  localparam integer t_cycle_ns =
-    (ADS_MODEL_ID == 8) ? T_CYCLE_NS_ADS8168 :
-    (ADS_MODEL_ID == 7) ? T_CYCLE_NS_ADS8167 :
-    (ADS_MODEL_ID == 6) ? T_CYCLE_NS_ADS8166 :
-    T_CYCLE_NS_ADS8166;
-
-  // Calculate cycles for conversion and cycle times
-  localparam integer n_conv_cycles  = (t_conv_ns  * SPI_CLK_HZ + 999_999_999) / 1_000_000_000;
-  localparam integer n_cycle_cycles = (t_cycle_ns * SPI_CLK_HZ + 999_999_999) / 1_000_000_000;
-
   // SPI command bit width
   localparam integer OTF_CMD_BITS = 16;
-
-  // Calculate minimum n_cs high time (cycles)
-  localparam integer n_cs_high_time_calc = (
-    (n_conv_cycles > (n_cycle_cycles - OTF_CMD_BITS) ? n_conv_cycles : (n_cycle_cycles - OTF_CMD_BITS)) > 3
-      ? (n_conv_cycles > (n_cycle_cycles - OTF_CMD_BITS) ? n_conv_cycles : (n_cycle_cycles - OTF_CMD_BITS))
-      : 3
-  );
-
-  // n_cs high time as wire
-  wire [8:0] n_cs_high_time = n_cs_high_time_calc[8:0];
 
 
   ///////////////////////////////////////////////////////////////////////////////
@@ -164,6 +127,8 @@ module shim_ads816x_adc_ctrl #(
   reg  [ 7:0] n_cs_timer;
   reg         running_n_cs_timer;
   wire        cs_wait_done;
+  // Latched n_cs high time
+  reg  [ 7:0] n_cs_high_time_latched;
   // SPI word index and bit counter
   reg  [ 3:0] adc_word_idx;
   reg  [ 4:0] spi_bit;
@@ -273,6 +238,12 @@ module shim_ads816x_adc_ctrl #(
     if (!resetn || state == S_ERROR) setup_done <= 1'b0;
     else if (boot_test_skip) setup_done <= 1'b1; // If boot test is skipped, set setup done immediately
     else if ((state == S_TEST_RD) && !n_miso_data_ready_mosi_clk && boot_readback_match) setup_done <= 1'b1;
+  end
+
+  // Latch n_cs_high_time when coming out of reset
+  always @(posedge clk) begin
+    if (!resetn) n_cs_high_time_latched <= 8'd0;
+    else if (state == S_RESET) n_cs_high_time_latched <= n_cs_high_time;
   end
 
 
@@ -409,7 +380,7 @@ module shim_ads816x_adc_ctrl #(
   // ~(Chip Select) timer
   always @(posedge clk) begin
     if (!resetn || state == S_ERROR) n_cs_timer <= 8'd0;
-    else if (start_spi_cmd) n_cs_timer <= n_cs_high_time;
+    else if (start_spi_cmd) n_cs_timer <= n_cs_high_time_latched;
     else if (n_cs_timer > 0) n_cs_timer <= n_cs_timer - 1;
     running_n_cs_timer <= (n_cs_timer > 0); // Flag to indicate if CS timer is running
   end

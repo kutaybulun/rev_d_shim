@@ -8,6 +8,7 @@ module shim_ad5676_dac_ctrl #(
 
   input  wire        boot_test_skip, // Skip the boot test sequence
   input  wire        debug, // Debug mode flag
+  input  wire [4:0]  n_cs_high_time, // n_cs high time in clock cycles (max 31)
 
   output reg         setup_done,
 
@@ -47,32 +48,8 @@ module shim_ad5676_dac_ctrl #(
   // SPI Timing Parameters
   ///////////////////////////////////////////////////////////////////////////////
 
-  // SPI clock frequency (Hz)
-  localparam integer SPI_CLK_HZ = 20_000_000;
-
-  // Update time (ns) for AD5676 (datasheet: time between rising edges of n_cs)
-  localparam integer T_UPDATE_NS_AD5676 = 830;
-  localparam integer T_MIN_N_CS_HIGH_NS = 30;
-
   // SPI command bit width
   localparam integer SPI_CMD_BITS = 24;
-
-  // Calculate cycles for update time
-  localparam integer t_update_cycles = (T_UPDATE_NS_AD5676 * SPI_CLK_HZ + 999_999_999) / 1_000_000_000;
-  // Calculate minimum n_cs high time in cycles (must be at least 4)
-  localparam integer t_min_n_cs_high_cycles = (T_MIN_N_CS_HIGH_NS * SPI_CLK_HZ + 999_999_999) / 1_000_000_000;
-  // Ensure minimum n_cs high time is at least 4 cycles
-  localparam integer t_min_n_cs_high_cycles_adjusted = (t_min_n_cs_high_cycles < 4) ? 4 : t_min_n_cs_high_cycles;
-
-  // Calculate minimum n_cs high time (cycles), must be at least t_min_n_cs_high_cycles_adjusted
-  localparam integer n_cs_high_time_calc =
-    (t_update_cycles < SPI_CMD_BITS) ? t_min_n_cs_high_cycles_adjusted :
-    (t_update_cycles - SPI_CMD_BITS < t_min_n_cs_high_cycles_adjusted) ? t_min_n_cs_high_cycles_adjusted :
-    (t_update_cycles - SPI_CMD_BITS > 31) ? 31 :
-    (t_update_cycles - SPI_CMD_BITS);
-
-  // n_cs high time as wire
-  wire [4:0] n_cs_high_time = n_cs_high_time_calc[4:0];
 
 
   ///////////////////////////////////////////////////////////////////////////////
@@ -170,6 +147,8 @@ module shim_ad5676_dac_ctrl #(
   reg  [ 4:0] n_cs_timer;
   reg         running_n_cs_timer;
   wire        cs_wait_done;
+  // Latched n_cs high time
+  reg  [ 4:0] n_cs_high_time_latched;
   // SPI channel index and bit counter
   reg  [ 2:0] dac_channel;
   reg  [ 4:0] spi_bit;
@@ -272,6 +251,12 @@ module shim_ad5676_dac_ctrl #(
     if (!resetn || state == S_ERROR) setup_done <= 1'b0; // Reset setup done on reset or error
     else if (boot_test_skip) setup_done <= 1'b1; // If boot test is skipped, set setup done immediately
     else if ((state == S_TEST_RD) && ~n_miso_data_ready_mosi_clk && boot_readback_match) setup_done <= 1'b1;
+  end
+
+  // Latch n_cs_high_time when coming out of reset
+  always @(posedge clk) begin
+    if (!resetn) n_cs_high_time_latched <= 5'd0;
+    else if (state == S_RESET) n_cs_high_time_latched <= n_cs_high_time;
   end
 
 
@@ -491,7 +476,7 @@ module shim_ad5676_dac_ctrl #(
   // ~(Chip Select) timer
   always @(posedge clk) begin
     if (!resetn || state == S_ERROR) n_cs_timer <= 5'd0;
-    else if (start_spi_cmd) n_cs_timer <= n_cs_high_time;
+    else if (start_spi_cmd) n_cs_timer <= n_cs_high_time_latched;
     else if (n_cs_timer > 0) n_cs_timer <= n_cs_timer - 1;
     running_n_cs_timer <= (n_cs_timer > 0); // Flag to indicate if CS timer is running
   end

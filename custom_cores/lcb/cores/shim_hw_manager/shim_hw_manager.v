@@ -13,9 +13,10 @@ module shim_hw_manager #(
   input   wire          aresetn, // Active low reset
 
   // Inputs
-  input   wire          sys_en,       // System enable (turn the system on)
-  input   wire          spi_off,      // SPI system powered off
-  input   wire          ext_en,       // External enable (deadman shutdown)
+  input   wire          sys_en,         // System enable (turn the system on)
+  input   wire          spi_off,        // SPI system powered off
+  input   wire          calc_n_cs_done, // DAC/ADC n_cs timing calculation done
+  input   wire          ext_en,         // External enable (deadman shutdown)
   // Pre-start configuration values
   input   wire          lock_viol,            // Configuration lock violation
   input   wire          sys_en_oob,           // System enable register out of bounds
@@ -25,9 +26,9 @@ module shim_hw_manager #(
   input   wire          integ_window_oob,     // Integrator window out of bounds
   input   wire          integ_en_oob,         // Integrator enable register out of bounds
   input   wire          boot_test_skip_oob,   // Boot test skip out of bounds
-  input   wire          debug_oob,           // Debug reg out of bounds
-  input   wire          mosi_sck_pol_oob,    // MOSI SCK polarity out of bounds
-  input   wire          miso_sck_pol_oob,    // MISO SCK polarity out of bounds
+  input   wire          debug_oob,            // Debug reg out of bounds
+  input   wire          mosi_sck_pol_oob,     // MOSI SCK polarity out of bounds
+  input   wire          miso_sck_pol_oob,     // MISO SCK polarity out of bounds
   // Shutdown sense (per board)
   input   wire  [ 7:0]  shutdown_sense, // Shutdown sense
   // Integrator (per board)
@@ -220,7 +221,7 @@ module shim_hw_manager #(
           if (!ext_en) begin
             state <= S_HALTING;
             status_code <= STS_EXT_SHUTDOWN;
-          end else if (timer >= 10 && spi_off) begin
+          end else if (timer >= 10 && spi_off && calc_n_cs_done) begin
             state <= S_POWER_ON_CRTL_BRD;
             timer <= 0;
             n_shutdown_force <= 1;

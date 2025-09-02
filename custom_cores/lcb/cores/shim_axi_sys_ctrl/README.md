@@ -1,4 +1,4 @@
-***Updated 2025-08-12***
+***Updated 2025-09-01***
 # AXI Shim Config Core
 
 The `shim_axi_sys_ctrl` module provides a configurable interface for managing system parameters and operation via an AXI4-Lite interface.

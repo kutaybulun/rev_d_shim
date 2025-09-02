@@ -1,4 +1,4 @@
-**Updated 2025-08-18**
+**Updated 2025-09-01**
 # ADS816x ADC Control Core
 
 The `shim_ads816x_adc_ctrl` module implements command-driven control for the Texas Instruments ADS816x ADC family (ADS8168, ADS8167, ADS8166) in the Rev D shim firmware. It handles SPI transactions, command sequencing, sample ordering, error detection, and synchronization for up to 8 ADC channels.
@@ -18,6 +18,7 @@ Set the target device using the `ADS_MODEL_ID` parameter.
 - `clk`, `resetn`: Main clock and active-low reset.
 - `boot_test_skip`: Skips boot-time SPI register test if asserted.
 - `debug`: Enables debug mode (debug outputs to the data buffer).
+- `n_cs_high_time [7:0]`: Chip select high time in clock cycles (max 255), latched when exiting reset.
 - `cmd_word [31:0]`: Command word from buffer.
 - `cmd_buf_empty`: Indicates command buffer is empty.
 - `trigger`: External trigger signal.
@@ -205,6 +206,7 @@ If none of the above conditions are met, the output word is zero and nothing is 
 ## Notes
 
 - SPI timing and chip select are managed to meet ADS816x requirements.
+- The `n_cs_high_time` input is latched when the state machine is in `S_RESET` to ensure stable timing parameters throughout operation.
 - Asynchronous FIFO and synchronizer modules are used for safe cross-domain data transfer.
 - Data buffer output is packed as two samples per 32-bit word.
 

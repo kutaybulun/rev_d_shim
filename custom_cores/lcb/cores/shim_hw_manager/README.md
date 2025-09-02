@@ -1,4 +1,4 @@
-***Updated 2025-08-08***
+***Updated 2025-09-01***
 # Hardware Manager Core
 
 The `shim_hw_manager` module manages the hardware system's startup, operation, and shutdown processes. It implements a state machine to sequence power-up, configuration, SPI subsystem enable, and error/shutdown handling.
@@ -14,7 +14,8 @@ The `shim_hw_manager` module manages the hardware system's startup, operation, a
 - **System Control**
   - `sys_en`: System enable (turn the system on).
   - `spi_off`: SPI system powered off.
-  - `ext_shutdown`: External shutdown.
+  - `calc_n_cs_done`: DAC/ADC n_cs timing calculation done.
+  - `ext_en`: External enable (deadman shutdown).
 
 - **Configuration Status**
   - `lock_viol`: Configuration lock violation.
@@ -53,6 +54,8 @@ The `shim_hw_manager` module manages the hardware system's startup, operation, a
   - `dac_data_buf_underflow [7:0]`: DAC data buffer underflow (per board).
   - `dac_data_buf_overflow [7:0]`: DAC data buffer overflow (per board).
   - `unexp_dac_trig [7:0]`: Unexpected DAC trigger (per board).
+  - `ldac_misalign [7:0]`: LDAC misalignment (per board).
+  - `dac_delay_too_short [7:0]`: DAC delay too short (per board).
 
 - **ADC Buffers and Commands**
   - `adc_boot_fail [7:0]`: ADC boot failure (per board).
@@ -62,6 +65,7 @@ The `shim_hw_manager` module manages the hardware system's startup, operation, a
   - `adc_data_buf_underflow [7:0]`: ADC data buffer underflow (per board).
   - `adc_data_buf_overflow [7:0]`: ADC data buffer overflow (per board).
   - `unexp_adc_trig [7:0]`: Unexpected ADC trigger (per board).
+  - `adc_delay_too_short [7:0]`: ADC delay too short (per board).
 
 ### Outputs
 
@@ -152,6 +156,8 @@ Status codes are 25 bits wide and include:
 - `25'h0606`: `STS_DAC_DATA_BUF_UNDERFLOW` - DAC data buffer underflow.
 - `25'h0607`: `STS_DAC_DATA_BUF_OVERFLOW` - DAC data buffer overflow.
 - `25'h0608`: `STS_UNEXP_DAC_TRIG` - Unexpected DAC trigger.
+- `25'h0609`: `STS_LDAC_MISALIGN` - LDAC misalignment.
+- `25'h060A`: `STS_DAC_DELAY_TOO_SHORT` - DAC delay too short.
 - `25'h0700`: `STS_ADC_BOOT_FAIL` - ADC boot failure.
 - `25'h0701`: `STS_BAD_ADC_CMD` - Bad ADC command.
 - `25'h0702`: `STS_ADC_CMD_BUF_UNDERFLOW` - ADC command buffer underflow.
@@ -159,6 +165,7 @@ Status codes are 25 bits wide and include:
 - `25'h0704`: `STS_ADC_DATA_BUF_UNDERFLOW` - ADC data buffer underflow.
 - `25'h0705`: `STS_ADC_DATA_BUF_OVERFLOW` - ADC data buffer overflow.
 - `25'h0706`: `STS_UNEXP_ADC_TRIG` - Unexpected ADC trigger.
+- `25'h0707`: `STS_ADC_DELAY_TOO_SHORT` - ADC delay too short.
 
 ## Board Number Extraction
 

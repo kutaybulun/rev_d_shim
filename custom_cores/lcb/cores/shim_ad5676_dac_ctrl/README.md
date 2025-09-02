@@ -1,4 +1,4 @@
-**Updated 2025-08-18**
+**Updated 2025-09-01**
 # AD5676 DAC Control Core
 
 The `shim_ad5676_dac_ctrl` module implements command-driven control for the Analog Devices AD5676 DAC in the Rev D shim firmware. It manages SPI transactions, command sequencing, per-channel calibration, error detection, and synchronization for all 8 DAC channels.
@@ -14,6 +14,7 @@ The `shim_ad5676_dac_ctrl` module implements command-driven control for the Anal
 - `clk`, `resetn`: Main clock and active-low reset.
 - `boot_test_skip`: Skips boot-time SPI register test if asserted.
 - `debug`: Enables debug mode (debug outputs to the data buffer).
+- `n_cs_high_time [4:0]`: Chip select high time in clock cycles (max 31), latched when exiting reset.
 - `cmd_word [31:0]`: Command word from buffer.
 - `cmd_buf_empty`: Indicates command buffer is empty.
 - `trigger`: External trigger signal.
@@ -209,6 +210,7 @@ If none of the above conditions are met, the output word is zero and nothing is 
 ## Notes
 
 - SPI timing and chip select are managed to meet AD5676 requirements.
+- The `n_cs_high_time` input is latched when the state machine is in `S_RESET` to ensure stable timing parameters throughout operation.
 - Offset/signed conversions handled internally (see source for conversion functions).
 - Asynchronous FIFO and synchronizer modules are used for safe cross-domain data transfer.
 - Data buffer output is for debug and boot test readback; normal DAC operation does not output samples.

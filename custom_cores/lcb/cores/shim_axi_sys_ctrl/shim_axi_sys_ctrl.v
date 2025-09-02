@@ -8,8 +8,8 @@ module shim_axi_sys_ctrl #
   parameter integer INTEG_EN_DEFAULT = 1,
   parameter integer BOOT_TEST_SKIP_DEFAULT = 0, // Default to not skipping boot test for all 16 cores
   parameter integer DEBUG = 0, // Default to no debug
-  parameter integer MOSI_SCK_POL_DEFAULT = 0, // Default to 0 MOSI SCK polarity
-  parameter integer MISO_SCK_POL_DEFAULT = 0 // Default to 0 MISO SCK polarity
+  parameter integer MOSI_SCK_POL_DEFAULT = 0, // Default to 0 MOSI SCK polarity (don't invert)
+  parameter integer MISO_SCK_POL_DEFAULT = 1 // Default to 1 MISO SCK polarity (invert)
 )
 (
   // System signals
