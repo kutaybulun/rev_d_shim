@@ -7,7 +7,8 @@ module axi_fifo_bridge #(
   parameter         ENABLE_READ    = 1  // 1=enable AXI reads from FIFO
 )(
   input  wire                       aclk,
-  input  wire                       aresetn,
+  input  wire                       wr_resetn,
+  input  wire                       rd_resetn,
 
   // AXI4-Lite subordinate interface
   input  wire [AXI_ADDR_WIDTH-1:0]   s_axi_awaddr,  // AXI4-Lite slave: Write address
@@ -59,7 +60,7 @@ module axi_fifo_bridge #(
 
   // Write response
   always @(posedge aclk) begin
-    if (!aresetn) begin
+    if (!wr_resetn) begin
       s_axi_bvalid <= 1'b0;
       s_axi_bresp  <= 2'b00;
       fifo_overflow <= 1'b0; // Reset overflow flag on reset
@@ -86,7 +87,7 @@ module axi_fifo_bridge #(
   assign fifo_rd_en    = try_read && read_allowed;
 
   always @(posedge aclk) begin
-    if (!aresetn) begin
+    if (!rd_resetn) begin
       s_axi_rvalid <= 1'b0;
       s_axi_rresp  <= 2'b00;
       s_axi_rdata  <= {AXI_DATA_WIDTH{1'b0}};
